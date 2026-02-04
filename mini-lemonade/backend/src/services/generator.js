@@ -14,6 +14,11 @@ const openai = process.env.OPENAI_API_KEY
 const ollamaModel = process.env.OLLAMA_MODEL;
 const ollamaBaseUrl = process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
 
+// DeepSeek Configuration
+const deepseekApiKey = process.env.DEEPSEEK_API_KEY;
+const deepseekBaseURL = process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com';
+const deepseekModel = process.env.DEEPSEEK_MODEL || 'deepseek-chat';
+
 // Logger utility
 function logInfo(message, data = {}) {
   console.log(`[Generator] ${message}`, data);
@@ -84,10 +89,18 @@ export async function generateSystem(type, prompt = '', userId = 'default') {
   let generationMethod = 'template';
   let lastError = null;
 
-  // Try to generate with AI (with retry logic)
-  if (process.env.OPENAI_API_KEY || process.env.OLLAMA_MODEL) {
+  // Try to generate with AI (Priority: DeepSeek -> OpenAI -> Ollama -> Template)
+  if (deepseekApiKey || process.env.OPENAI_API_KEY || process.env.OLLAMA_MODEL) {
     try {
-      if (process.env.OPENAI_API_KEY) {
+      if (deepseekApiKey) {
+        logInfo('Using DeepSeek for generation');
+        files = await RetryManager.executeWithRetry(
+          () => generateWithDeepSeek(prompt, type),
+          2, // max 2 retries for DeepSeek
+          1000
+        );
+        generationMethod = 'deepseek';
+      } else if (process.env.OPENAI_API_KEY) {
         logInfo('Using OpenAI for generation');
         files = await RetryManager.executeWithRetry(
           () => generateWithOpenAI(prompt, type),
@@ -231,6 +244,82 @@ function getDefaultTemplate(type) {
       return questTemplate();
     default:
       return {};
+  }
+}
+
+async function generateWithDeepSeek(prompt, type = 'attack') {
+  const systemMessage = `You are an expert Roblox Lua engineer specializing in scalable game systems.
+
+Generate a complete, production-ready ${type} system based on the user's requirements.
+
+CRITICAL RULES:
+1. Return ONLY valid JSON wrapped in {}
+2. Start with { and end with } - NO markdown blocks, NO explanations before/after
+3. Use Roblox best practices (RemoteEvents, proper service architecture)
+4. Include detailed comments explaining key functionality
+5. Make code modular and maintainable
+6. Add sanity checks and error handling
+7. Follow Roblox naming conventions
+8. Ensure balanced parentheses, brackets, and braces
+9. Include server AND client code when needed
+
+Required JSON format:
+{
+  "files": {
+    "ServiceName.lua": "-- Complete server-side code here",
+    "ClientScript.lua": "-- Complete client-side code here"
+  }
+}
+
+VALIDATION REQUIREMENTS:
+- All Lua code must have balanced braces, brackets, parentheses
+- Every function must have a matching 'end'
+- All strings must be properly quoted
+- Code must be syntactically valid Lua
+- Generate minimum 3-4 files for a complete system`;
+
+  const userMessage = `Create a ${type} system with these specific requirements: ${prompt}\n\nReturn ONLY JSON, starting with { and ending with }. No markdown, no explanations.`;
+
+  try {
+    logInfo('Calling DeepSeek API');
+    
+    const response = await fetch(`${deepseekBaseURL}/v1/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${deepseekApiKey}`
+      },
+      body: JSON.stringify({
+        model: deepseekModel,
+        messages: [
+          { role: 'system', content: systemMessage },
+          { role: 'user', content: userMessage }
+        ],
+        temperature: 0.1,
+        max_tokens: 4000
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`DeepSeek API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const content = data?.choices?.[0]?.message?.content?.trim();
+    
+    if (!content) {
+      throw new Error('Empty response from DeepSeek');
+    }
+
+    // Validate and parse response
+    const files = ResponseValidator.validateJsonResponse(content, type);
+    
+    logInfo('DeepSeek generation successful', { fileCount: Object.keys(files).length });
+    return files;
+    
+  } catch (error) {
+    logError('DeepSeek generation failed', { error: error.message });
+    throw error; // Let retry logic handle this
   }
 }
 
