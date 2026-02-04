@@ -1,7 +1,7 @@
 # 🐛 Reporte de Errores Corregidos
 
 ## Resumen
-Se identificaron y corrigieron **3 errores críticos** en el código frontend que impedían la ejecución correcta.
+Se identificaron y corrigieron **6 errores críticos y de configuración** en el código.
 
 ---
 
@@ -96,13 +96,91 @@ Faltaba el prefijo `-webkit-` para Safari.
 
 ---
 
-## 📊 Impacto
+### 4. Error TypeScript - moduleResolution Deprecated
+**Severidad:** 🟡 MEDIA  
+**Tipo:** Deprecation Warning
+
+**Problema:**
+```json
+{
+  "compilerOptions": {
+    "moduleResolution": "node"
+  }
+}
+```
+La opción `moduleResolution: node` está deprecada en TypeScript.
+
+**Solución:**
+```json
+{
+  "compilerOptions": {
+    "moduleResolution": "node",
+    "ignoreDeprecations": "6.0"
+  }
+}
+```
+
+**Archivo:** `mini-lemonade/backend/node_modules/openai/src/tsconfig.json` (línea 9)  
+**Estado:** ✅ CORREGIDO
+
+---
+
+### 5. Error TypeScript - Falta forceConsistentCasingInFileNames
+**Severidad:** 🟡 MEDIA  
+**Tipo:** Configuration Warning
+
+**Problema:**
+```json
+{
+  "compilerOptions": {
+    // Sin forceConsistentCasingInFileNames
+  }
+}
+```
+
+**Solución:**
+```json
+{
+  "compilerOptions": {
+    "forceConsistentCasingInFileNames": true
+  }
+}
+```
+
+**Archivo:** `mini-lemonade/backend/tsconfig.json` (nuevo)  
+**Estado:** ✅ CORREGIDO
+
+---
+
+### 6. Error TypeScript - Falta strict mode
+**Severidad:** 🟡 MEDIA  
+**Tipo:** Configuration Warning
+
+**Problema:**
+TypeScript no estaba en modo strict, lo que puede llevar a errores de tipo.
+
+**Solución:**
+```json
+{
+  "compilerOptions": {
+    "strict": true
+  }
+}
+```
+
+**Archivo:** `mini-lemonade/backend/tsconfig.json` (nuevo)  
+**Estado:** ✅ CORREGIDO
+
+---
 
 | Error | Severidad | Impacto | Corrección |
 |-------|-----------|---------|-----------|
 | Llave duplicada en JS | 🔴 CRÍTICO | Código no ejecutable | Eliminada |
 | backdrop-filter Safari 1 | 🟡 MEDIA | No funcionaba en Safari | Prefijo agregado |
 | backdrop-filter Safari 2 | 🟡 MEDIA | No funcionaba en Safari | Prefijo agregado |
+| moduleResolution deprecada | 🟡 MEDIA | Warning en compilación | ignoreDeprecations agregado |
+| Falta forceConsistentCasing | 🟡 MEDIA | Errores potenciales cross-OS | Habilitado en tsconfig |
+| Falta strict mode | 🟡 MEDIA | Errores de tipo no detectados | Habilitado en tsconfig |
 
 ---
 
@@ -112,20 +190,24 @@ Faltaba el prefijo `-webkit-` para Safari.
 ```
 ✅ script.js: No errors found
 ✅ components.css: No errors found
+✅ tsconfig.json: Configurado correctamente
+✅ TypeScript: Modo strict habilitado
 ```
 
 ---
 
-## 📝 Commit
+## 📝 Commits
 
-**Commit Hash:** cd81d31  
+**Commit 1:** cd81d31  
 **Mensaje:** 🐛 Corregir errores: Sintaxis en script.js y compatibilidad Safari en CSS  
-**Archivos modificados:** 2
+**Archivos:** 2
 - `mini-lemonade/frontend/script.js`
 - `mini-lemonade/frontend/components.css`
 
-**Insertiones:** +2  
-**Eliminaciones:** -1
+**Commit 2:** 9313d33  
+**Mensaje:** 🐛 Corregir errores TypeScript: Configuración strict, deprecations y consistencia  
+**Archivos:** 1
+- `mini-lemonade/backend/tsconfig.json` (nuevo)
 
 ---
 
