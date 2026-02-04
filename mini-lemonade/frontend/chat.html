@@ -118,6 +118,22 @@
       background: #b71c1c;
     }
 
+    .monitor-link {
+      text-decoration: none;
+      color: #90caf9;
+      padding: 8px 12px;
+      font-size: 0.9em;
+      cursor: pointer;
+      background: rgba(144, 202, 249, 0.1);
+      border: 1px solid rgba(144, 202, 249, 0.3);
+      border-radius: 6px;
+      transition: all 0.3s ease;
+    }
+
+    .monitor-link:hover {
+      background: rgba(144, 202, 249, 0.2);
+    }
+
     /* Chat Messages Area */
     .chat-messages {
       padding: 20px;
@@ -392,9 +408,7 @@
           <span class="plugin-status-dot"></span>
           <span id="pluginText">Verificando plugin...</span>
         </div>
-        <a href="/monitor.html" title="Monitoreo del servidor" style="text-decoration: none; color: #90caf9; padding: 8px 12px; font-size: 0.9em; cursor: pointer; background: rgba(144, 202, 249, 0.1); border: 1px solid rgba(144, 202, 249, 0.3); border-radius: 6px; transition: all 0.3s ease;" onmouseover="this.style.background='rgba(144, 202, 249, 0.2)'" onmouseout="this.style.background='rgba(144, 202, 249, 0.1)'">
-          📊 Monitor
-        </a>
+        <a href="/monitor.html" title="Monitoreo del servidor" class="monitor-link">📊 Monitor</a>
         <div id="userNameHeader">Cargando...</div>
         <button class="logout-btn" onclick="logout()">Cerrar sesión</button>
       </div>
