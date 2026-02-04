@@ -112,7 +112,7 @@ export async function generateSystem(type, prompt = '', userId = 'default') {
 
   // Save to history
   try {
-    saveToHistory(userId, type, prompt, files);
+    await saveToHistory(userId, type, prompt, files);
   } catch (error) {
     logError('Failed to save to history', { error: error.message });
   }

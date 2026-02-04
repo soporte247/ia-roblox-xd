@@ -1,11 +1,10 @@
 import express from 'express';
-import fs from 'fs';
-import path from 'path';
+import { dbAll, dbRun } from '../services/database.js';
 
 const router = express.Router();
 
 // Get history for a user
-router.get('/', (req, res) => {
+router.get('/', async (req, res) => {
   try {
     const { userId } = req.query;
 
@@ -13,13 +12,34 @@ router.get('/', (req, res) => {
       return res.status(400).json({ error: 'UserId is required' });
     }
 
-    const historyFile = path.resolve(`generated/${userId}/history.json`);
+    const rows = await dbAll(
+      `SELECT id, userId, systemType, generatedCode, metadata, createdAt
+       FROM generated_systems
+       WHERE userId = ?
+       ORDER BY createdAt DESC
+       LIMIT 50`,
+      [userId]
+    );
 
-    if (!fs.existsSync(historyFile)) {
-      return res.json({ history: [] });
-    }
+    const history = rows.map((row) => {
+      let metadata = {};
+      try {
+        metadata = row.metadata ? JSON.parse(row.metadata) : {};
+      } catch {
+        metadata = {};
+      }
 
-    const history = JSON.parse(fs.readFileSync(historyFile, 'utf8'));
+      return {
+        id: row.id,
+        type: row.systemType,
+        prompt: metadata.prompt || '',
+        fileCount: metadata.fileCount || 0,
+        timestamp: row.createdAt,
+        files: metadata.files || {},
+        generatedCode: row.generatedCode || null,
+      };
+    });
+
     res.json({ history });
   } catch (error) {
     console.error('History error:', error);
@@ -28,31 +48,21 @@ router.get('/', (req, res) => {
 });
 
 // Save to history
-export function saveToHistory(userId, type, prompt, files) {
+export async function saveToHistory(userId, type, prompt, files) {
   try {
-    const userDir = path.resolve(`generated/${userId}`);
-    fs.mkdirSync(userDir, { recursive: true });
-
-    const historyFile = path.join(userDir, 'history.json');
-    let history = [];
-
-    if (fs.existsSync(historyFile)) {
-      history = JSON.parse(fs.readFileSync(historyFile, 'utf8'));
-    }
-
-    history.unshift({
-      id: Date.now(),
-      type,
+    const metadata = {
       prompt,
-      fileCount: Object.keys(files).length,
-      timestamp: new Date().toISOString(),
-      files: files,
-    });
+      fileCount: Object.keys(files || {}).length,
+      files: files || {},
+    };
 
-    // Keep only last 50 entries
-    history = history.slice(0, 50);
+    const generatedCode = JSON.stringify(files || {});
 
-    fs.writeFileSync(historyFile, JSON.stringify(history, null, 2));
+    await dbRun(
+      `INSERT INTO generated_systems (userId, systemType, generatedCode, metadata)
+       VALUES (?, ?, ?, ?)`,
+      [userId, type, generatedCode, JSON.stringify(metadata)]
+    );
   } catch (error) {
     console.error('Failed to save history:', error);
   }
