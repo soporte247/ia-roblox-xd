@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DataShark IA - Dashboard</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: linear-gradient(135deg, #0a1929 0%, #1a237e 100%);
+      color: white;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      min-height: 100vh;
+    }
+
+    .dashboard {
+      display: grid;
+      grid-template-columns: 250px 1fr;
+      min-height: 100vh;
+    }
+
+    /* Sidebar */
+    .sidebar {
+      background: rgba(0, 0, 0, 0.3);
+      padding: 30px 20px;
+      border-right: 1px solid rgba(66, 165, 245, 0.2);
+    }
+
+    .logo {
+      font-size: 1.5em;
+      font-weight: 700;
+      margin-bottom: 40px;
+      color: #42a5f5;
+    }
+
+    .nav-menu {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .nav-item {
+      padding: 12px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      border: 1px solid transparent;
+    }
+
+    .nav-item:hover {
+      background: rgba(66, 165, 245, 0.1);
+      border-color: rgba(66, 165, 245, 0.3);
+    }
+
+    .nav-item.active {
+      background: rgba(66, 165, 245, 0.2);
+      border-color: #42a5f5;
+    }
+
+    .user-info {
+      position: fixed;
+      bottom: 30px;
+      width: 210px;
+      padding: 15px;
+      background: rgba(66, 165, 245, 0.1);
+      border: 1px solid rgba(66, 165, 245, 0.2);
+      border-radius: 8px;
+      font-size: 0.9em;
+    }
+
+    .user-avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      margin-bottom: 10px;
+      object-fit: cover;
+    }
+
+    .logout-btn {
+      margin-top: 10px;
+      padding: 8px 12px;
+      background: #d32f2f;
+      border: none;
+      border-radius: 6px;
+      color: white;
+      cursor: pointer;
+      width: 100%;
+      transition: all 0.3s ease;
+    }
+
+    .logout-btn:hover {
+      background: #b71c1c;
+    }
+
+    .user-username {
+      color: #90caf9;
+      font-size: 0.85em;
+    }
+
+    .template-button {
+      margin-left: 10px;
+    }
+
+    .history-list {
+      max-width: 800px;
+    }
+
+    .api-keys-list {
+      margin-top: 20px;
+      max-width: 800px;
+    }
+
+    /* Main Content */
+    .main-content {
+      padding: 40px;
+      overflow-y: auto;
+    }
+
+    .content-section {
+      display: none;
+    }
+
+    .content-section.active {
+      display: block;
+    }
+
+    h1 {
+      font-size: 2.5em;
+      margin-bottom: 30px;
+      background: linear-gradient(135deg, #42a5f5 0%, #ab47bc 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    /* Generator Section */
+    .generator-form {
+      background: rgba(255, 255, 255, 0.05);
+      padding: 30px;
+      border-radius: 12px;
+      border: 1px solid rgba(66, 165, 245, 0.2);
+      max-width: 600px;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 8px;
+      color: #b3e5fc;
+      font-weight: 600;
+    }
+
+    select, input[type="text"], textarea {
+      width: 100%;
+      padding: 12px;
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid rgba(66, 165, 245, 0.3);
+      border-radius: 6px;
+      color: white;
+      font-family: inherit;
+    }
+
+    select:focus, input:focus, textarea:focus {
+      outline: none;
+      border-color: #42a5f5;
+      box-shadow: 0 0 10px rgba(66, 165, 245, 0.2);
+    }
+
+    textarea {
+      resize: vertical;
+      min-height: 100px;
+    }
+
+    .btn {
+      padding: 12px 30px;
+      border: none;
+      border-radius: 6px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #42a5f5 0%, #1e88e5 100%);
+      color: white;
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 12px 24px rgba(66, 165, 245, 0.4);
+    }
+
+    .btn-secondary {
+      background: transparent;
+      border: 1px solid #42a5f5;
+      color: #42a5f5;
+    }
+
+    .btn-secondary:hover {
+      background: rgba(66, 165, 245, 0.1);
+    }
+
+    .btn-danger {
+      background: #d32f2f;
+      color: white;
+    }
+
+    .btn-danger:hover {
+      background: #b71c1c;
+    }
+
+    /* Result Section */
+    .result-card {
+      background: rgba(66, 165, 245, 0.05);
+      border: 1px solid rgba(66, 165, 245, 0.3);
+      border-radius: 12px;
+      padding: 20px;
+      margin-top: 20px;
+    }
+
+    .code-preview {
+      background: rgba(0, 0, 0, 0.5);
+      padding: 15px;
+      border-radius: 6px;
+      overflow-x: auto;
+      margin-top: 10px;
+      font-family: 'Courier New', monospace;
+      font-size: 0.9em;
+    }
+
+    /* API Keys Section */
+    .api-keys-container {
+      max-width: 800px;
+    }
+
+    .api-key-item {
+      background: rgba(66, 165, 245, 0.05);
+      padding: 15px;
+      border-radius: 8px;
+      border: 1px solid rgba(66, 165, 245, 0.2);
+      margin-bottom: 15px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .key-display {
+      font-family: 'Courier New', monospace;
+      color: #42a5f5;
+      word-break: break-all;
+    }
+
+    .key-meta {
+      color: #90caf9;
+      font-size: 0.9em;
+      margin-top: 5px;
+    }
+
+    .key-actions {
+      display: flex;
+      gap: 10px;
+    }
+
+    .btn-small {
+      padding: 8px 12px;
+      font-size: 0.9em;
+    }
+
+    /* History Section */
+    .history-item {
+      background: rgba(66, 165, 245, 0.05);
+      padding: 15px;
+      border-radius: 8px;
+      border-left: 4px solid #42a5f5;
+      margin-bottom: 15px;
+    }
+
+    .history-header {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+
+    .history-type {
+      color: #ab47bc;
+      font-weight: 600;
+    }
+
+    .history-date {
+      color: #90caf9;
+      font-size: 0.9em;
+    }
+
+    .history-preview {
+      color: #b3e5fc;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-size: 0.9em;
+      margin-top: 10px;
+    }
+
+    /* Loading and Messages */
+    .loading {
+      text-align: center;
+      padding: 20px;
+      color: #42a5f5;
+    }
+
+    .spinner {
+      border: 4px solid rgba(66, 165, 245, 0.2);
+      border-top-color: #42a5f5;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 10px;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .message {
+      padding: 15px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+    }
+
+    .message.success {
+      background: rgba(76, 175, 80, 0.2);
+      border: 1px solid rgba(76, 175, 80, 0.5);
+      color: #c8e6c9;
+    }
+
+    .message.error {
+      background: rgba(211, 47, 47, 0.2);
+      border: 1px solid rgba(211, 47, 47, 0.5);
+      color: #ef9a9a;
+    }
+
+    @media (max-width: 768px) {
+      .dashboard {
+        grid-template-columns: 1fr;
+      }
+
+      .sidebar {
+        display: none;
+      }
+
+      .main-content {
+        padding: 20px;
+      }
+
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="dashboard">
+    <!-- Sidebar -->
+    <div class="sidebar">
+      <div class="logo">🦈 DataShark</div>
+      <div class="nav-menu">
+        <div class="nav-item active" data-section="generator">
+          <strong>⚡ Generar Código</strong>
+        </div>
+        <div class="nav-item" data-section="history">
+          <strong>📜 Historial</strong>
+        </div>
+        <div class="nav-item" data-section="keys">
+          <strong>🔑 API Keys</strong>
+        </div>
+      </div>
+
+      <div class="user-info" id="userInfo">
+        <img id="userAvatar" class="user-avatar" alt="Avatar">
+        <div><strong id="userName">Cargando...</strong></div>
+        <div id="userUsername" class="user-username"></div>
+        <button class="logout-btn" onclick="logout()">Cerrar sesión</button>
+      </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+      <!-- Generator Section -->
+      <section id="generator" class="content-section active">
+        <h1>⚡ Generar Código</h1>
+        
+        <div id="message"></div>
+
+        <div class="generator-form">
+          <div class="form-group">
+            <label>Sistema a generar:</label>
+            <select id="systemType" title="Selecciona el tipo de sistema a generar" onchange="loadTemplates()">
+              <option value="">Selecciona un sistema...</option>
+              <option value="Attack">🔥 Sistema de Ataque</option>
+              <option value="Shop">🛍️ Sistema de Tienda</option>
+              <option value="UI">🎨 Sistema de UI</option>
+              <option value="Inventory">📦 Sistema de Inventario</option>
+              <option value="Quest">📋 Sistema de Misiones</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>Descripción (opcional):</label>
+            <textarea id="description" placeholder="Describe lo que necesitas..."></textarea>
+          </div>
+
+          <button class="btn btn-primary" onclick="generateCode()">Generar con IA</button>
+          <button class="btn btn-secondary template-button" onclick="showTemplate()">Ver Template</button>
+        </div>
+
+        <div id="resultSection"></div>
+      </section>
+
+      <!-- History Section -->
+      <section id="history" class="content-section">
+        <h1>📜 Historial</h1>
+        <div id="historyList" class="history-list"></div>
+      </section>
+
+      <!-- API Keys Section -->
+      <section id="keys" class="content-section">
+        <h1>🔑 API Keys</h1>
+        <button class="btn btn-primary" onclick="createApiKey()">+ Generar nueva API Key</button>
+        <div id="apiKeysList" class="api-keys-list"></div>
+      </section>
+    </div>
+  </div>
+
+  <script>
+    // API Base
+    const API_BASE = window.location.origin;
+
+    // Cambiar secciones
+    document.querySelectorAll('.nav-item').forEach(item => {
+      item.addEventListener('click', function() {
+        const section = this.dataset.section;
+        
+        document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+        this.classList.add('active');
+
+        document.querySelectorAll('.content-section').forEach(s => s.classList.remove('active'));
+        document.getElementById(section).classList.add('active');
+
+        if (section === 'history') loadHistory();
+        if (section === 'keys') loadApiKeys();
+      });
+    });
+
+    // Cargar información del usuario
+    async function loadUserInfo() {
+      try {
+        const response = await fetch(`${API_BASE}/auth/me`, {
+          credentials: 'include'
+        });
+
+        if (!response.ok) {
+          window.location.href = '/';
+          return;
+        }
+
+        const user = await response.json();
+        document.getElementById('userName').textContent = user.displayName || user.username;
+        document.getElementById('userUsername').textContent = `@${user.username}`;
+        document.getElementById('userAvatar').src = user.avatarUrl;
+      } catch (error) {
+        console.error('Error loading user info:', error);
+        window.location.href = '/';
+      }
+    }
+
+    // Cargar templates
+    async function loadTemplates() {
+      const systemType = document.getElementById('systemType').value;
+      if (!systemType) return;
+
+      try {
+        const response = await fetch(`${API_BASE}/templates?type=${systemType}`, {
+          credentials: 'include'
+        });
+        const data = await response.json();
+        // El template se puede mostrar en la UI
+      } catch (error) {
+        console.error('Error loading templates:', error);
+      }
+    }
+
+    // Generar código
+    async function generateCode() {
+      const systemType = document.getElementById('systemType').value;
+      const description = document.getElementById('description').value;
+
+      if (!systemType) {
+        showMessage('Por favor selecciona un sistema', 'error');
+        return;
+      }
+
+      const resultSection = document.getElementById('resultSection');
+      resultSection.innerHTML = '<div class="loading"><div class="spinner"></div>Generando código...</div>';
+
+      try {
+        const response = await fetch(`${API_BASE}/generate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            systemType,
+            description: description || 'Default'
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error('Error generating code');
+        }
+
+        const data = await response.json();
+        displayResult(data);
+      } catch (error) {
+        showMessage('Error al generar código: ' + error.message, 'error');
+        resultSection.innerHTML = '';
+      }
+    }
+
+    // Mostrar template
+    async function showTemplate() {
+      const systemType = document.getElementById('systemType').value;
+      if (!systemType) {
+        showMessage('Por favor selecciona un sistema', 'error');
+        return;
+      }
+
+      try {
+        const response = await fetch(`${API_BASE}/templates?type=${systemType}`, {
+          credentials: 'include'
+        });
+        const data = await response.json();
+        document.getElementById('resultSection').innerHTML = `
+          <div class="result-card">
+            <h3>Template: ${systemType}</h3>
+            <div class="code-preview">${data.template || 'No template found'}</div>
+          </div>
+        `;
+      } catch (error) {
+        showMessage('Error loading template: ' + error.message, 'error');
+      }
+    }
+
+    // Mostrar resultado
+    function displayResult(data) {
+      const resultSection = document.getElementById('resultSection');
+      resultSection.innerHTML = `
+        <div class="result-card">
+          <h3>✨ Código Generado</h3>
+          <div class="code-preview">${escapeHtml(data.code || data.generatedCode || '')}</div>
+          <button class="btn btn-primary" style="margin-top: 15px;" onclick="copyCode()">📋 Copiar código</button>
+          <button class="btn btn-secondary" style="margin-left: 10px;" onclick="saveGeneration()">💾 Guardar</button>
+        </div>
+      `;
+    }
+
+    // Copiar código
+    function copyCode() {
+      const codeElement = document.querySelector('.code-preview');
+      const text = codeElement.textContent;
+      navigator.clipboard.writeText(text).then(() => {
+        showMessage('✅ Código copiado al portapapeles', 'success');
+      });
+    }
+
+    // Guardar generación
+    async function saveGeneration() {
+      const systemType = document.getElementById('systemType').value;
+      const codeElement = document.querySelector('.code-preview');
+      const code = codeElement.textContent;
+
+      try {
+        const response = await fetch(`${API_BASE}/save`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            systemType,
+            code
+          })
+        });
+
+        if (!response.ok) throw new Error('Error saving');
+        showMessage('✅ Generación guardada correctamente', 'success');
+      } catch (error) {
+        showMessage('Error al guardar: ' + error.message, 'error');
+      }
+    }
+
+    // Cargar historial
+    async function loadHistory() {
+      const historyList = document.getElementById('historyList');
+      historyList.innerHTML = '<div class="loading"><div class="spinner"></div>Cargando historial...</div>';
+
+      try {
+        const response = await fetch(`${API_BASE}/history`, {
+          credentials: 'include'
+        });
+
+        if (!response.ok) throw new Error('Error loading history');
+
+        const data = await response.json();
+        const items = data.history || [];
+
+        if (items.length === 0) {
+          historyList.innerHTML = '<p>No hay generaciones en el historial</p>';
+          return;
+        }
+
+        historyList.innerHTML = items.map(item => `
+          <div class="history-item">
+            <div class="history-header">
+              <span class="history-type">${item.systemType || 'Unknown'}</span>
+              <span class="history-date">${new Date(item.createdAt).toLocaleString()}</span>
+            </div>
+            <div class="history-preview">${escapeHtml(item.generatedCode).substring(0, 200)}...</div>
+          </div>
+        `).join('');
+      } catch (error) {
+        historyList.innerHTML = '<p>Error loading history: ' + error.message + '</p>';
+      }
+    }
+
+    // Cargar API Keys
+    async function loadApiKeys() {
+      const apiKeysList = document.getElementById('apiKeysList');
+      apiKeysList.innerHTML = '<div class="loading"><div class="spinner"></div>Cargando API Keys...</div>';
+
+      try {
+        const response = await fetch(`${API_BASE}/api/keys`, {
+          credentials: 'include'
+        });
+
+        if (!response.ok) throw new Error('Error loading API keys');
+
+        const data = await response.json();
+        const keys = data.data || [];
+
+        if (keys.length === 0) {
+          apiKeysList.innerHTML = '<p>No tienes API Keys. Crea una para começar.</p>';
+          return;
+        }
+
+        apiKeysList.innerHTML = keys.map(key => `
+          <div class="api-key-item">
+            <div style="flex: 1;">
+              <div class="key-display">${key.keyDisplay}</div>
+              <div class="key-meta">
+                Creada: ${new Date(key.createdAt).toLocaleString()}
+                ${key.lastUsed ? `| Último uso: ${new Date(key.lastUsed).toLocaleString()}` : ''}
+              </div>
+            </div>
+            <div class="key-actions">
+              <button class="btn btn-danger btn-small" onclick="revokeKey('${key.id}')">Revocar</button>
+            </div>
+          </div>
+        `).join('');
+      } catch (error) {
+        apiKeysList.innerHTML = '<p>Error: ' + error.message + '</p>';
+      }
+    }
+
+    // Crear API Key
+    async function createApiKey() {
+      try {
+        const response = await fetch(`${API_BASE}/api/keys`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({})
+        });
+
+        if (!response.ok) throw new Error('Error creating API key');
+
+        const data = await response.json();
+        showMessage(`✅ API Key creada: ${data.data.key}`, 'success');
+        loadApiKeys();
+      } catch (error) {
+        showMessage('Error: ' + error.message, 'error');
+      }
+    }
+
+    // Revocar API Key
+    async function revokeKey(keyId) {
+      if (!confirm('¿Estás seguro de que quieres revocar esta API Key?')) return;
+
+      try {
+        const response = await fetch(`${API_BASE}/api/keys/${keyId}`, {
+          method: 'DELETE',
+          credentials: 'include'
+        });
+
+        if (!response.ok) throw new Error('Error revoking key');
+
+        showMessage('✅ API Key revocada', 'success');
+        loadApiKeys();
+      } catch (error) {
+        showMessage('Error: ' + error.message, 'error');
+      }
+    }
+
+    // Cerrar sesión
+    function logout() {
+      fetch(`${API_BASE}/auth/logout`, {
+        credentials: 'include'
+      }).then(() => {
+        window.location.href = '/';
+      });
+    }
+
+    // Utilidades
+    function showMessage(message, type) {
+      const messageDiv = document.getElementById('message');
+      messageDiv.innerHTML = `<div class="message ${type}">${message}</div>`;
+      setTimeout(() => {
+        messageDiv.innerHTML = '';
+      }, 5000);
+    }
+
+    function escapeHtml(text) {
+      const map = {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#039;'
+      };
+      return text.replace(/[&<>"']/g, m => map[m]);
+    }
+
+    // Cargar usuario al abrir la página
+    loadUserInfo();
+  </script>
+</body>
+</html>

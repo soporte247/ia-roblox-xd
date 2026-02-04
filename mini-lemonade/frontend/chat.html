@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DataShark IA - Chat</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: linear-gradient(135deg, #0a1929 0%, #1a237e 100%);
+      color: white;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      min-height: 100vh;
+    }
+
+    .chat-container {
+      display: grid;
+      grid-template-columns: 1fr;
+      grid-template-rows: auto 1fr auto;
+      height: 100vh;
+      max-width: 1000px;
+      margin: 0 auto;
+    }
+
+    /* Header */
+    .chat-header {
+      background: rgba(0, 0, 0, 0.3);
+      padding: 20px;
+      border-bottom: 1px solid rgba(66, 165, 245, 0.2);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .chat-header h1 {
+      font-size: 1.8em;
+      color: #42a5f5;
+    }
+
+    .user-info-header {
+      display: flex;
+      gap: 15px;
+      align-items: center;
+    }
+
+    .plugin-status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      background: rgba(76, 175, 80, 0.2);
+      border: 1px solid #4caf50;
+      border-radius: 6px;
+      font-size: 0.9em;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .plugin-status:hover {
+      background: rgba(76, 175, 80, 0.3);
+    }
+
+    .plugin-status.unavailable {
+      background: rgba(244, 67, 54, 0.2);
+      border-color: #f44336;
+    }
+
+    .plugin-status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #4caf50;
+      animation: pulse 2s infinite;
+    }
+
+    .plugin-status.unavailable .plugin-status-dot {
+      background: #f44336;
+      animation: none;
+    }
+
+    @keyframes pulse {
+      0%, 100% {
+        opacity: 1;
+      }
+      50% {
+        opacity: 0.5;
+      }
+    }
+
+    .user-avatar-header {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: #42a5f5;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+    }
+
+    .logout-btn {
+      padding: 10px 20px;
+      background: #d32f2f;
+      border: none;
+      border-radius: 6px;
+      color: white;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      font-weight: 600;
+    }
+
+    .logout-btn:hover {
+      background: #b71c1c;
+    }
+
+    /* Chat Messages Area */
+    .chat-messages {
+      padding: 20px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+
+    .message {
+      display: flex;
+      gap: 10px;
+      animation: fadeInUp 0.3s ease-out;
+    }
+
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .message.user {
+      justify-content: flex-end;
+    }
+
+    .message-content {
+      max-width: 70%;
+      padding: 12px 16px;
+      border-radius: 12px;
+      line-height: 1.5;
+      word-wrap: break-word;
+    }
+
+    .message.ai .message-content {
+      background: rgba(66, 165, 245, 0.2);
+      border: 1px solid rgba(66, 165, 245, 0.3);
+      color: #b3e5fc;
+    }
+
+    .message.user .message-content {
+      background: linear-gradient(135deg, #42a5f5 0%, #1e88e5 100%);
+      color: white;
+    }
+
+    .code-block {
+      background: #1e1e1e;
+      padding: 15px;
+      border-radius: 8px;
+      overflow-x: auto;
+      margin-top: 10px;
+      font-family: 'Courier New', monospace;
+      font-size: 0.85em;
+      line-height: 1.4;
+      color: #d4d4d4;
+    }
+
+    .code-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .code-btn {
+      padding: 8px 12px;
+      background: #42a5f5;
+      border: none;
+      border-radius: 4px;
+      color: white;
+      cursor: pointer;
+      font-size: 0.85em;
+      transition: all 0.3s ease;
+    }
+
+    .code-btn:hover {
+      background: #1e88e5;
+    }
+
+    .loading-dots {
+      display: flex;
+      gap: 5px;
+    }
+
+    .loading-dots span {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #42a5f5;
+      animation: bounce 1.4s infinite;
+    }
+
+    .loading-dots span:nth-child(2) {
+      animation-delay: 0.2s;
+    }
+
+    .loading-dots span:nth-child(3) {
+      animation-delay: 0.4s;
+    }
+
+    @keyframes bounce {
+      0%, 100% { opacity: 0.3; }
+      50% { opacity: 1; }
+    }
+
+    /* Input Area */
+    .chat-input-area {
+      background: rgba(0, 0, 0, 0.3);
+      padding: 20px;
+      border-top: 1px solid rgba(66, 165, 245, 0.2);
+      display: flex;
+      gap: 10px;
+    }
+
+    .input-wrapper {
+      display: flex;
+      gap: 10px;
+      width: 100%;
+    }
+
+    #messageInput {
+      flex: 1;
+      padding: 12px 16px;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(66, 165, 245, 0.3);
+      border-radius: 8px;
+      color: white;
+      font-size: 1em;
+      resize: none;
+      max-height: 120px;
+    }
+
+    #messageInput::placeholder {
+      color: rgba(255, 255, 255, 0.5);
+    }
+
+    #messageInput:focus {
+      outline: none;
+      border-color: #42a5f5;
+      background: rgba(66, 165, 245, 0.1);
+    }
+
+    .send-btn {
+      padding: 12px 24px;
+      background: linear-gradient(135deg, #42a5f5 0%, #1e88e5 100%);
+      border: none;
+      border-radius: 8px;
+      color: white;
+      cursor: pointer;
+      font-weight: 600;
+      transition: all 0.3s ease;
+      white-space: nowrap;
+    }
+
+    .send-btn:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 16px rgba(66, 165, 245, 0.4);
+    }
+
+    .send-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    /* System Type Selector */
+    .system-selector {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      margin-bottom: 15px;
+    }
+
+    .system-selector select {
+      padding: 8px 12px;
+      background: rgba(66, 165, 245, 0.2);
+      border: 1px solid rgba(66, 165, 245, 0.3);
+      border-radius: 6px;
+      color: white;
+      cursor: pointer;
+      font-size: 0.9em;
+    }
+
+    .system-selector select option {
+      background: #1a237e;
+      color: white;
+    }
+
+    /* Empty State */
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      color: rgba(255, 255, 255, 0.5);
+      text-align: center;
+      padding: 40px;
+    }
+
+    .empty-state-icon {
+      font-size: 4em;
+      margin-bottom: 20px;
+    }
+
+    .empty-state-text {
+      font-size: 1.2em;
+      margin-bottom: 10px;
+    }
+
+    .empty-state-subtext {
+      font-size: 0.9em;
+      max-width: 400px;
+    }
+
+    /* Scrollbar */
+    .chat-messages::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    .chat-messages::-webkit-scrollbar-track {
+      background: rgba(66, 165, 245, 0.1);
+      border-radius: 10px;
+    }
+
+    .chat-messages::-webkit-scrollbar-thumb {
+      background: rgba(66, 165, 245, 0.3);
+      border-radius: 10px;
+    }
+
+    .chat-messages::-webkit-scrollbar-thumb:hover {
+      background: rgba(66, 165, 245, 0.5);
+    }
+
+    .toast {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: #4CAF50;
+      color: white;
+      padding: 12px 20px;
+      border-radius: 6px;
+      z-index: 1000;
+      animation: slideIn 0.3s ease-out;
+    }
+
+    .toast.error {
+      background: #f44336;
+    }
+
+    @keyframes slideIn {
+      from {
+        transform: translateX(400px);
+        opacity: 0;
+      }
+      to {
+        transform: translateX(0);
+        opacity: 1;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="chat-container">
+    <!-- Header -->
+    <div class="chat-header">
+      <h1>🦈 DataShark IA</h1>
+      <div class="user-info-header">
+        <div id="pluginStatus" class="plugin-status" title="Estado del plugin">
+          <span class="plugin-status-dot"></span>
+          <span id="pluginText">Verificando plugin...</span>
+        </div>
+        <a href="/monitor.html" title="Monitoreo del servidor" style="text-decoration: none; color: #90caf9; padding: 8px 12px; font-size: 0.9em; cursor: pointer; background: rgba(144, 202, 249, 0.1); border: 1px solid rgba(144, 202, 249, 0.3); border-radius: 6px; transition: all 0.3s ease;" onmouseover="this.style.background='rgba(144, 202, 249, 0.2)'" onmouseout="this.style.background='rgba(144, 202, 249, 0.1)'">
+          📊 Monitor
+        </a>
+        <div id="userNameHeader">Cargando...</div>
+        <button class="logout-btn" onclick="logout()">Cerrar sesión</button>
+      </div>
+    </div>
+
+    <!-- Messages Area -->
+    <div class="chat-messages" id="chatMessages">
+      <div class="empty-state">
+        <div class="empty-state-icon">🦈</div>
+        <div class="empty-state-text">¡Bienvenido a DataShark IA!</div>
+        <div class="empty-state-subtext">Describe el sistema Lua que necesitas y te ayudaré a generarlo.</div>
+      </div>
+    </div>
+
+    <!-- Input Area -->
+    <div class="chat-input-area">
+      <div class="chat-input-wrapper">
+        <div class="system-selector">
+          <label for="systemType" class="system-label">Tipo de sistema:</label>
+          <select id="systemType" title="Selecciona el tipo de sistema">
+            <option value="">Auto-detectar</option>
+            <option value="Attack">⚔️ Attack</option>
+            <option value="Shop">🛒 Shop</option>
+            <option value="UI">🎨 UI</option>
+            <option value="Inventory">📦 Inventory</option>
+            <option value="Quest">📜 Quest</option>
+          </select>
+        </div>
+        <div class="input-wrapper">
+          <textarea 
+            id="messageInput" 
+            placeholder="Describe el sistema que necesitas... (Ej: Un sistema de combate con cooldown de 2 segundos)"
+            rows="2"
+          ></textarea>
+          <button class="send-btn" id="sendBtn" onclick="sendMessage()">Enviar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Auto-resize textarea
+    const messageInput = document.getElementById('messageInput');
+    messageInput.addEventListener('input', function() {
+      this.style.height = 'auto';
+      this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+    });
+
+    // Load user info
+    async function loadUserInfo() {
+      try {
+        // Verificar si está logueado
+        const isLogged = localStorage.getItem('isLogged');
+        if (isLogged !== 'true') {
+          window.location.href = '/login.html';
+          return;
+        }
+        const userName = localStorage.getItem('userName') || 'Usuario';
+        document.getElementById('userNameHeader').textContent = userName;
+      } catch (error) {
+        console.error('Error:', error);
+        window.location.href = '/login.html';
+      }
+    }
+
+    // Send message
+    async function sendMessage() {
+      const message = messageInput.value.trim();
+      const systemType = document.getElementById('systemType').value;
+
+      if (!message) {
+        showToast('Por favor escribe algo', 'error');
+        return;
+      }
+
+      // Add user message to chat
+      addMessage(message, 'user');
+      messageInput.value = '';
+      messageInput.style.height = 'auto';
+
+      // Show loading indicator
+      const loadingId = showLoading();
+
+      try {
+        const response = await fetch('/generate', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            prompt: message,
+            systemType: systemType || 'auto'
+          })
+        });
+
+        removeMessage(loadingId);
+
+        if (!response.ok) {
+          throw new Error('Error generating code');
+        }
+
+        const data = await response.json();
+        
+        // Show AI response with code
+        const aiMessage = document.createElement('div');
+        aiMessage.className = 'message ai';
+        aiMessage.innerHTML = `
+          <div class="message-content">
+            <p>${data.result || 'Sistema generado exitosamente'}</p>
+            ${data.code ? `
+              <div class="code-block">${escapeHtml(data.code)}</div>
+              <div class="code-actions">
+                <button class="code-btn" onclick="copyCode('${btoa(data.code)}')">📋 Copiar</button>
+                <button class="code-btn" onclick="downloadCode('${btoa(data.code)}')">⬇️ Descargar</button>
+              </div>
+            ` : ''}
+          </div>
+        `;
+        document.getElementById('chatMessages').appendChild(aiMessage);
+        scrollToBottom();
+
+      } catch (error) {
+        console.error('Error:', error);
+        showToast('Error al generar código: ' + error.message, 'error');
+      }
+    }
+
+    function addMessage(text, sender) {
+      const messageDiv = document.createElement('div');
+      messageDiv.className = `message ${sender}`;
+      messageDiv.innerHTML = `<div class="message-content">${escapeHtml(text)}</div>`;
+      
+      const chatMessages = document.getElementById('chatMessages');
+      
+      // Remove empty state if exists
+      const emptyState = chatMessages.querySelector('.empty-state');
+      if (emptyState) {
+        emptyState.remove();
+      }
+      
+      chatMessages.appendChild(messageDiv);
+      scrollToBottom();
+    }
+
+    function showLoading() {
+      const loadingDiv = document.createElement('div');
+      loadingDiv.className = 'message ai';
+      loadingDiv.id = 'loading-' + Date.now();
+      loadingDiv.innerHTML = `
+        <div class="message-content">
+          <div class="loading-dots">
+            <span></span>
+            <span></span>
+            <span></span>
+          </div>
+        </div>
+      `;
+      document.getElementById('chatMessages').appendChild(loadingDiv);
+      scrollToBottom();
+      return loadingDiv.id;
+    }
+
+    function removeMessage(id) {
+      const msg = document.getElementById(id);
+      if (msg) msg.remove();
+    }
+
+    function copyCode(encoded) {
+      const code = atob(encoded);
+      navigator.clipboard.writeText(code).then(() => {
+        showToast('✓ Código copiado', 'success');
+      });
+    }
+
+    function downloadCode(encoded) {
+      const code = atob(encoded);
+      const blob = new Blob([code], { type: 'text/plain' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'datashark-code.lua';
+      a.click();
+    }
+
+    function scrollToBottom() {
+      const chatMessages = document.getElementById('chatMessages');
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+
+    function showToast(message, type = 'success') {
+      const toast = document.createElement('div');
+      toast.className = `toast ${type === 'error' ? 'error' : ''}`;
+      toast.textContent = message;
+      document.body.appendChild(toast);
+      
+      setTimeout(() => {
+        toast.style.animation = 'slideIn 0.3s ease-out reverse';
+        setTimeout(() => toast.remove(), 300);
+      }, 2000);
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    async function logout() {
+      localStorage.removeItem('isLogged');
+      localStorage.removeItem('userName');
+      localStorage.removeItem('userEmail');
+      window.location.href = '/';
+    }
+
+    // Enter to send
+    messageInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendMessage();
+      }
+    });
+
+    // Verificar estado del plugin
+    async function checkPluginStatus() {
+      try {
+        const response = await fetch('/api/plugin/status');
+        const data = await response.json();
+        
+        const statusElement = document.getElementById('pluginStatus');
+        const textElement = document.getElementById('pluginText');
+        
+        if (data.installed) {
+          statusElement.classList.remove('unavailable');
+          textElement.textContent = '✅ Plugin disponible';
+          statusElement.title = `Plugin DataShark detectado\nTamaño: ${(data.size / 1024).toFixed(2)} KB`;
+          
+          // Agregar funcionalidad para descargar el plugin
+          statusElement.onclick = () => {
+            window.location.href = '/api/plugin/download';
+          };
+        } else {
+          statusElement.classList.add('unavailable');
+          textElement.textContent = '❌ Plugin no disponible';
+          statusElement.title = 'El plugin DataShark no ha sido detectado';
+        }
+      } catch (error) {
+        console.error('Error verificando plugin:', error);
+        document.getElementById('pluginStatus').classList.add('unavailable');
+        document.getElementById('pluginText').textContent = '⚠️ Error';
+      }
+    }
+
+    // Initialize
+    loadUserInfo();
+    checkPluginStatus();
+  </script>
+</body>
+</html>

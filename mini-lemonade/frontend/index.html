@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DataShark IA - Roblox System Generator</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- LANDING PAGE -->
+  <div id="landingPage" class="landing">
+    <!-- Hero Section -->
+    <section class="hero">
+      <div class="hero-content">
+        <h1>
+          La primera<br>
+          <span class="gradient-text">Generador de IA</span><br>
+          para Roblox
+        </h1>
+        <p>Genera sistemas Lua profesionales con IA. Desde combate hasta inventarios, todo en minutos.</p>
+        <div class="hero-buttons">
+          <a href="/login.html" class="btn btn-primary">🦈 Comenzar a generar</a>
+          <button class="btn btn-secondary">Ver más →</button>
+        </div>
+      </div>
+      <div class="hero-image">
+        <div class="placeholder-box">
+          <span>🦈</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Trust Section -->
+    <section class="trust">
+      <h2>No nos creáis solo</h2>
+      <div class="testimonials">
+        <div class="testimonial">
+          <div class="avatar">👨‍💻</div>
+          <p class="quote">"Ahorré 10 horas de código."</p>
+          <p class="author">@DevRoblox</p>
+        </div>
+        <div class="testimonial">
+          <div class="avatar">👩‍💻</div>
+          <p class="quote">"Finalmente puedo prototipar rápido."</p>
+          <p class="author">@GameCreator</p>
+        </div>
+        <div class="testimonial">
+          <div class="avatar">🎮</div>
+          <p class="quote">"El mejor plugin para Roblox Studio."</p>
+          <p class="author">@RobloxDev</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Features Section -->
+    <section class="features-full">
+      <h2>Nos encargamos de las cosas difíciles</h2>
+      
+      <div class="features-cards">
+        <div class="feature-full">
+          <div class="feature-icon-large">⚔️</div>
+          <h3>Código listo para producción</h3>
+          <p>Sin basura, sin errores. Los scripts generados están optimizados y listos para usar.</p>
+        </div>
+        <div class="feature-full">
+          <div class="feature-icon-large">📋</div>
+          <h3>Historial completo</h3>
+          <p>Accede a todos tus sistemas. Nada se pierde, todo guardado.</p>
+        </div>
+        <div class="feature-full">
+          <div class="feature-icon-large">🎨</div>
+          <h3>Totalmente compatible</h3>
+          <p>Todos los sistemas son compatibles entre sí. Combínalos como necesites.</p>
+        </div>
+        <div class="feature-full">
+          <div class="feature-icon-large">🛠️</div>
+          <h3>Rápido y confiable</h3>
+          <p>Generación en segundos. Calidad garantizada.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="cta-large">
+      <h2>Prototipado rápido para desarrolladores</h2>
+      <p>Crea desde cero en minutos, no en horas. El futuro del desarrollo en Roblox.</p>
+      <button id="startBtn2" class="btn btn-primary btn-large">Comenzar a probar</button>
+    </section>
+
+    <!-- FAQ Section -->
+    <section class="faq">
+      <h2>Preguntas frecuentes</h2>
+      <div class="faq-items">
+        <div class="faq-item">
+          <h3>¿Es gratis?</h3>
+          <p>Sí, completamente gratis. Genera sistemas sin límite.</p>
+        </div>
+        <div class="faq-item">
+          <h3>¿Puedo usar el código?</h3>
+          <p>100% tuyo. Úsalo, modifícalo, vende lo que hagas con él.</p>
+        </div>
+        <div class="faq-item">
+          <h3>¿Necesito saber Lua?</h3>
+          <p>No es necesario, pero ayuda. El código está documentado.</p>
+        </div>
+        <div class="faq-item">
+          <h3>¿Funciona con Roblox?</h3>
+          <p>100% compatible con cualquier juego Roblox moderno.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <p>DataShark IA • Generador de sistemas Lua para Roblox • v1.1.0</p>
+    </footer>
+  </div>
+
+  <!-- MAIN APP (Hidden until user clicks Start) -->
+  <div id="appContainer" class="app-hidden">
+    <div class="container">
+      <header>
+        <div class="header-top">
+          <h1>🦈 DataShark IA</h1>
+          <button id="backToMenuBtn" class="btn-back">← Atrás</button>
+        </div>
+        <p>Generador de Sistemas Lua para Roblox</p>
+        <div class="status-bar">
+          <span id="aiStatus" class="status-indicator">🤖 Ollama</span>
+          <span id="serverStatus" class="status-indicator">🟢 Conectado</span>
+          <button id="darkModeToggle" class="icon-btn" title="Toggle Dark Mode">🌙</button>
+        </div>
+      </header>
+
+      <main>
+      <section class="input-section">
+        <div class="input-header">
+          <label for="prompt">Describe el sistema que necesitas:</label>
+          <div class="header-controls">
+            <button id="templatesBtn" class="btn btn-small">📋 Plantillas</button>
+            <select id="systemType" class="system-select" title="Tipo de sistema">
+              <option value="auto">Auto-detectar</option>
+              <option value="attack">⚔️ Attack</option>
+              <option value="shop">🛒 Shop</option>
+              <option value="ui">🎨 UI</option>
+              <option value="inventory">📦 Inventory</option>
+              <option value="quest">📜 Quest</option>
+            </select>
+          </div>
+        </div>
+        <textarea
+          id="prompt"
+          placeholder="Ej: Quiero un sistema de ataque con cooldown de 2 segundos, daño crítico y efectos visuales"
+          rows="5"
+        ></textarea>
+        
+        <div class="button-group">
+          <button id="generateBtn" class="btn btn-primary">✨ Generar Sistema</button>
+          <button id="historyBtn" class="btn btn-secondary">📜 Historial</button>
+          <button id="exportBtn" class="btn btn-secondary hidden">📦 Exportar ZIP</button>
+          <button id="clearBtn" class="btn btn-secondary">🗑️ Limpiar</button>
+          <button id="copyBtn" class="btn btn-secondary hidden">📋 Copiar Código</button>
+        </div>
+      </section>
+
+      <section class="output-section">
+        <div class="tabs">
+          <button class="tab active" data-tab="result">📊 Resultado</button>
+          <button class="tab" data-tab="code">💻 Código</button>
+          <button class="tab" data-tab="info">ℹ️ Información</button>
+        </div>
+
+        <div class="tab-content active" id="result-tab">
+          <div id="loading" class="loading hidden">
+            <div class="spinner"></div>
+            <p>Generando con IA... ⏳</p>
+          </div>
+          <div id="result" class="result"></div>
+        </div>
+
+        <div class="tab-content" id="code-tab">
+          <div class="code-header">
+            <span>📝 Editor de Código</span>
+            <button id="saveCodeBtn" class="btn btn-small hidden">💾 Guardar Cambios</button>
+          </div>
+          <div id="codeViewer" class="code-viewer">
+            <p class="empty-state">Genera un sistema para ver el código aquí</p>
+          </div>
+        </div>
+
+        <div class="tab-content" id="info-tab">
+          <div class="info-content">
+            <h3>📚 Tipos de Sistemas</h3>
+            <div class="system-card">
+              <h4>⚔️ Attack System</h4>
+              <p>Sistema completo de combate con:</p>
+              <ul>
+                <li>Gestión de ataques y daño</li>
+                <li>Sistema de cooldown</li>
+                <li>Detección de hits</li>
+                <li>Cliente y servidor</li>
+              </ul>
+            </div>
+            <div class="system-card">
+              <h4>🛒 Shop System</h4>
+              <p>Sistema de tienda con inventario y transacciones</p>
+            </div>
+            <div class="system-card">
+              <h4>🎨 UI System</h4>
+              <p>Interfaces de usuario personalizadas</p>
+            </div>
+            <div class="system-card">
+              <h4>📦 Inventory System</h4>
+              <p>Sistema de inventario con slots y stacking</p>
+            </div>
+            <div class="system-card">
+              <h4>📜 Quest System</h4>
+              <p>Misiones y objetivos con rewards</p>
+            </div>
+
+            <h3>🚀 Cómo usar</h3>
+            <ol>
+              <li>Describe lo que necesitas en el campo de texto</li>
+              <li>Haz clic en "Generar Sistema"</li>
+              <li>Revisa el código generado</li>
+              <li>Usa el plugin de Roblox Studio para importar</li>
+            </ol>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <p>DataShark IA v1.0.0 | Backend: http://localhost:3000</p>
+    </footer>
+  </div>
+
+  <!-- History Modal -->
+  <div id="historyModal" class="modal hidden">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>📜 Historial de Generaciones</h2>
+        <button class="modal-close">&times;</button>
+      </div>
+      <div id="historyList" class="history-list"></div>
+    </div>
+  </div>
+
+  <!-- Templates Modal -->
+  <div id="templatesModal" class="modal hidden">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>📋 Plantillas Predefinidas</h2>
+        <button class="modal-close">&times;</button>
+      </div>
+      <div id="templatesList" class="templates-list"></div>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>

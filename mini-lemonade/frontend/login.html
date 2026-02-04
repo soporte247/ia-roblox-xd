@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DataShark IA - Login</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: linear-gradient(135deg, #0a1929 0%, #1a237e 100%);
+      color: white;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .login-container {
+      background: rgba(0, 0, 0, 0.5);
+      padding: 40px;
+      border-radius: 16px;
+      border: 1px solid rgba(66, 165, 245, 0.2);
+      width: 100%;
+      max-width: 400px;
+      -webkit-backdrop-filter: blur(10px);
+      backdrop-filter: blur(10px);
+    }
+
+    .login-header {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+
+    .login-header h1 {
+      font-size: 2.5em;
+      color: #42a5f5;
+      margin-bottom: 10px;
+    }
+
+    .login-header p {
+      color: #b3e5fc;
+      font-size: 1em;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 30px;
+      border-bottom: 1px solid rgba(66, 165, 245, 0.2);
+    }
+
+    .tab-btn {
+      flex: 1;
+      padding: 12px 0;
+      background: transparent;
+      border: none;
+      color: #90caf9;
+      cursor: pointer;
+      font-size: 1em;
+      font-weight: 600;
+      border-bottom: 3px solid transparent;
+      transition: all 0.3s ease;
+    }
+
+    .tab-btn.active {
+      color: #42a5f5;
+      border-bottom-color: #42a5f5;
+    }
+
+    .tab-content {
+      display: none;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 8px;
+      color: #b3e5fc;
+      font-weight: 500;
+    }
+
+    input {
+      width: 100%;
+      padding: 12px 16px;
+      background: rgba(66, 165, 245, 0.1);
+      border: 1px solid rgba(66, 165, 245, 0.3);
+      border-radius: 8px;
+      color: white;
+      font-size: 1em;
+      transition: all 0.3s ease;
+    }
+
+    input::placeholder {
+      color: rgba(255, 255, 255, 0.5);
+    }
+
+    input:focus {
+      outline: none;
+      border-color: #42a5f5;
+      background: rgba(66, 165, 245, 0.2);
+      box-shadow: 0 0 0 3px rgba(66, 165, 245, 0.1);
+    }
+
+    .submit-btn {
+      width: 100%;
+      padding: 14px;
+      background: linear-gradient(135deg, #42a5f5 0%, #1e88e5 100%);
+      border: none;
+      border-radius: 8px;
+      color: white;
+      font-size: 1em;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      margin-top: 10px;
+    }
+
+    .submit-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 16px rgba(66, 165, 245, 0.4);
+    }
+
+    .submit-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .error-message {
+      color: #ff6b6b;
+      font-size: 0.9em;
+      margin-top: 10px;
+      padding: 10px;
+      background: rgba(255, 107, 107, 0.1);
+      border-radius: 6px;
+      display: none;
+    }
+
+    .error-message.show {
+      display: block;
+    }
+
+    .success-message {
+      color: #4CAF50;
+      font-size: 0.9em;
+      margin-top: 10px;
+      padding: 10px;
+      background: rgba(76, 175, 80, 0.1);
+      border-radius: 6px;
+      display: none;
+    }
+
+    .success-message.show {
+      display: block;
+    }
+
+    .divider {
+      text-align: center;
+      color: rgba(255, 255, 255, 0.5);
+      margin: 20px 0;
+      font-size: 0.9em;
+    }
+
+    .back-link {
+      text-align: center;
+      margin-top: 20px;
+    }
+
+    .back-link a {
+      color: #42a5f5;
+      text-decoration: none;
+      transition: color 0.3s ease;
+    }
+
+    .back-link a:hover {
+      color: #90caf9;
+    }
+
+    .loading {
+      display: inline-block;
+      width: 14px;
+      height: 14px;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-right: 8px;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    @media (max-width: 600px) {
+      .login-container {
+        padding: 30px 20px;
+      }
+
+      .login-header h1 {
+        font-size: 2em;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="login-container">
+    <div class="login-header">
+      <h1>🦈 DataShark</h1>
+      <p>Generador de IA para Roblox</p>
+    </div>
+
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchTab('login')">Iniciar sesión</button>
+      <button class="tab-btn" onclick="switchTab('register')">Crear cuenta</button>
+    </div>
+
+    <!-- Login Tab -->
+    <div id="login" class="tab-content active">
+      <form onsubmit="handleLogin(event)">
+        <div class="form-group">
+          <label for="loginEmail">Email</label>
+          <input type="email" id="loginEmail" placeholder="tu@email.com" required>
+        </div>
+        <div class="form-group">
+          <label for="loginPassword">Contraseña</label>
+          <input type="password" id="loginPassword" placeholder="••••••••" required>
+        </div>
+        <button type="submit" class="submit-btn" id="loginBtn">Iniciar sesión</button>
+        <div class="error-message" id="loginError"></div>
+        <div class="success-message" id="loginSuccess"></div>
+      </form>
+    </div>
+
+    <!-- Register Tab -->
+    <div id="register" class="tab-content">
+      <form onsubmit="handleRegister(event)">
+        <div class="form-group">
+          <label for="registerName">Nombre de usuario</label>
+          <input type="text" id="registerName" placeholder="Tu nombre" required>
+        </div>
+        <div class="form-group">
+          <label for="registerEmail">Email</label>
+          <input type="email" id="registerEmail" placeholder="tu@email.com" required>
+        </div>
+        <div class="form-group">
+          <label for="registerPassword">Contraseña</label>
+          <input type="password" id="registerPassword" placeholder="••••••••" required minlength="6">
+        </div>
+        <div class="form-group">
+          <label for="registerPassword2">Confirmar contraseña</label>
+          <input type="password" id="registerPassword2" placeholder="••••••••" required minlength="6">
+        </div>
+        <button type="submit" class="submit-btn" id="registerBtn">Crear cuenta</button>
+        <div class="error-message" id="registerError"></div>
+        <div class="success-message" id="registerSuccess"></div>
+      </form>
+    </div>
+
+    <div class="back-link">
+      <a href="/">← Volver al menú</a>
+    </div>
+  </div>
+
+  <script>
+    const MAX_LOGIN_ATTEMPTS = 5;
+    const LOCKOUT_TIME = 15 * 60 * 1000; // 15 minutos
+    let loginAttempts = 0;
+    let isLocked = false;
+
+    // Tab switching
+    function switchTab(tab) {
+      // Hide all tabs
+      document.getElementById('login').classList.remove('active');
+      document.getElementById('register').classList.remove('active');
+
+      // Remove active from all buttons
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+
+      // Show selected tab
+      document.getElementById(tab).classList.add('active');
+      event.target.classList.add('active');
+
+      // Clear messages
+      clearMessages();
+    }
+
+    function clearMessages() {
+      document.getElementById('loginError').classList.remove('show');
+      document.getElementById('loginSuccess').classList.remove('show');
+      document.getElementById('registerError').classList.remove('show');
+      document.getElementById('registerSuccess').classList.remove('show');
+    }
+
+    function checkLoginLockout() {
+      const lockoutTime = localStorage.getItem('loginLockoutTime');
+      if (lockoutTime) {
+        const now = Date.now();
+        const remainingTime = parseInt(lockoutTime) - now;
+        
+        if (remainingTime > 0) {
+          const minutes = Math.ceil(remainingTime / 1000 / 60);
+          return `Demasiados intentos fallidos. Intenta de nuevo en ${minutes} minuto(s).`;
+        } else {
+          localStorage.removeItem('loginLockoutTime');
+          localStorage.removeItem('loginAttempts');
+        }
+      }
+      return null;
+    }
+
+    function recordFailedLogin() {
+      let attempts = parseInt(localStorage.getItem('loginAttempts') || '0');
+      attempts++;
+      localStorage.setItem('loginAttempts', attempts.toString());
+
+      if (attempts >= MAX_LOGIN_ATTEMPTS) {
+        const lockoutTime = Date.now() + LOCKOUT_TIME;
+        localStorage.setItem('loginLockoutTime', lockoutTime.toString());
+      }
+    }
+
+    function clearLoginAttempts() {
+      localStorage.removeItem('loginAttempts');
+      localStorage.removeItem('loginLockoutTime');
+    }
+
+    async function handleLogin(e) {
+      e.preventDefault();
+
+      // Verificar bloqueo
+      const lockoutError = checkLoginLockout();
+      if (lockoutError) {
+        const errorDiv = document.getElementById('loginError');
+        errorDiv.textContent = '🔒 ' + lockoutError;
+        errorDiv.classList.add('show');
+        return;
+      }
+
+      const email = document.getElementById('loginEmail').value;
+      const password = document.getElementById('loginPassword').value;
+      const loginBtn = document.getElementById('loginBtn');
+      const errorDiv = document.getElementById('loginError');
+      const successDiv = document.getElementById('loginSuccess');
+
+      try {
+        loginBtn.disabled = true;
+        loginBtn.innerHTML = '<span class="loading"></span>Verificando...';
+
+        // Validar format
+        if (!email || !password) {
+          throw new Error('Email y contraseña son requeridos');
+        }
+
+        if (password.length < 6) {
+          throw new Error('Contraseña inválida');
+        }
+
+        // Llamar al backend para validar
+        const response = await fetch('/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password })
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.message || 'Error al iniciar sesión');
+        }
+
+        const data = await response.json();
+
+        // Limpiar intentos fallidos
+        clearLoginAttempts();
+
+        // Guardar sesión segura
+        localStorage.setItem('userEmail', email);
+        localStorage.setItem('userName', data.userName || email.split('@')[0]);
+        localStorage.setItem('isLogged', 'true');
+        localStorage.setItem('sessionToken', data.token);
+
+        successDiv.textContent = '✓ Sesión iniciada correctamente';
+        successDiv.classList.add('show');
+
+        setTimeout(() => {
+          window.location.href = '/chat.html';
+        }, 1000);
+      } catch (error) {
+        recordFailedLogin();
+        const attempts = parseInt(localStorage.getItem('loginAttempts') || '0');
+        const remaining = MAX_LOGIN_ATTEMPTS - attempts;
+
+        if (remaining <= 0) {
+          errorDiv.textContent = '🔒 Cuenta bloqueada por 15 minutos';
+        } else {
+          errorDiv.textContent = `❌ ${error.message} (${remaining} intentos restantes)`;
+        }
+        errorDiv.classList.add('show');
+      } finally {
+        loginBtn.disabled = false;
+        loginBtn.innerHTML = 'Iniciar sesión';
+      }
+    }
+
+    async function handleRegister(e) {
+      e.preventDefault();
+      const name = document.getElementById('registerName').value;
+      const email = document.getElementById('registerEmail').value;
+      const password = document.getElementById('registerPassword').value;
+      const password2 = document.getElementById('registerPassword2').value;
+      const registerBtn = document.getElementById('registerBtn');
+      const errorDiv = document.getElementById('registerError');
+      const successDiv = document.getElementById('registerSuccess');
+
+      try {
+        registerBtn.disabled = true;
+        registerBtn.innerHTML = '<span class="loading"></span>Creando cuenta...';
+
+        // Validar
+        if (!name || !email || !password) {
+          throw new Error('Todos los campos son requeridos');
+        }
+
+        if (password !== password2) {
+          throw new Error('Las contraseñas no coinciden');
+        }
+
+        if (password.length < 6) {
+          throw new Error('La contraseña debe tener al menos 6 caracteres');
+        }
+
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+          throw new Error('Email inválido');
+        }
+
+        // Llamar al backend para registrar
+        const response = await fetch('/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, email, password })
+        });
+
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.message || 'Error al crear cuenta');
+        }
+
+        const data = await response.json();
+
+        // Guardar sesión segura
+        localStorage.setItem('userEmail', email);
+        localStorage.setItem('userName', name);
+        localStorage.setItem('isLogged', 'true');
+        localStorage.setItem('sessionToken', data.token);
+
+        successDiv.textContent = '✓ Cuenta creada correctamente';
+        successDiv.classList.add('show');
+
+        setTimeout(() => {
+          window.location.href = '/chat.html';
+        }, 1000);
+      } catch (error) {
+        errorDiv.textContent = '❌ ' + error.message;
+        errorDiv.classList.add('show');
+      } finally {
+        registerBtn.disabled = false;
+        registerBtn.innerHTML = 'Crear cuenta';
+      }
+    }
+
+    // Check if already logged in
+    window.addEventListener('load', () => {
+      if (localStorage.getItem('isLogged') === 'true') {
+        window.location.href = '/chat.html';
+      }
+
+      // Mostrar bloqueo si está activo
+      const lockoutError = checkLoginLockout();
+      if (lockoutError) {
+        const errorDiv = document.getElementById('loginError');
+        errorDiv.textContent = '🔒 ' + lockoutError;
+        errorDiv.classList.add('show');
+        document.getElementById('loginBtn').disabled = true;
+      }
+    });
+  </script>
+</body>
+</html>
