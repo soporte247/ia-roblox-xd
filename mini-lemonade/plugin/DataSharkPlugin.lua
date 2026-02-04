@@ -18,6 +18,8 @@ MEJORAS v3.0:
 local HttpService = game:GetService('HttpService')
 local ServerScriptService = game:GetService('ServerScriptService')
 local ChangeHistoryService = game:GetService('ChangeHistoryService')
+local StudioService = game:GetService('StudioService')
+local Players = game:GetService('Players')
 
 -- ===== CONFIGURACIÓN =====
 local DEFAULT_URL = "https://datashark-ia2.onrender.com"
@@ -26,10 +28,29 @@ local RETRY_DELAY = 1
 local REQUEST_TIMEOUT = 30
 local HISTORY_SIZE = 20
 
+-- ===== IDENTIDAD DE USUARIO =====
+local function resolveUserId()
+	local success, id = pcall(function()
+		return StudioService:GetUserId()
+	end)
+
+	if success and id and id ~= 0 then
+		return id
+	end
+
+	local localPlayer = Players.LocalPlayer
+	if localPlayer and localPlayer.UserId then
+		return localPlayer.UserId
+	end
+
+	return 0
+end
+
 -- ===== ESTADO GLOBAL =====
 local state = {
 	backendUrl = DEFAULT_URL,
 	sessionId = "",
+	userId = resolveUserId(),
 	currentPrompt = "",
 	currentQuestions = {},
 	currentSystemType = "",
@@ -341,12 +362,13 @@ local urlBox = UI.createTextBox(configPanel, "https://datashark-ia2.onrender.com
 urlBox.Text = Storage.get("backendUrl") or DEFAULT_URL
 
 local saveUrlBtn = UI.createButton(configPanel, "💾 Guardar URL", UDim2.new(0, 0, 0, 80), UDim2.new(1, 0, 0, 40), Color3.fromRGB(76, 175, 80))
+local newSessionBtn = UI.createButton(configPanel, "🆕 Nueva sesión", UDim2.new(0, 0, 0, 130), UDim2.new(1, 0, 0, 40), Color3.fromRGB(255, 152, 0))
 
 -- Historial
-UI.createLabel(configPanel, "📜 Historial de Generaciones:", UDim2.new(0, 0, 0, 130))
+UI.createLabel(configPanel, "📜 Historial de Generaciones:", UDim2.new(0, 0, 0, 180))
 local historyBox = Instance.new("TextLabel")
 historyBox.Size = UDim2.new(1, 0, 0, 150)
-historyBox.Position = UDim2.new(0, 0, 0, 160)
+historyBox.Position = UDim2.new(0, 0, 0, 210)
 historyBox.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
 historyBox.BorderSizePixel = 0
 historyBox.Text = "(sin historial)"
@@ -364,17 +386,17 @@ historyPadding.PaddingRight = UDim.new(0, 8)
 historyPadding.PaddingTop = UDim.new(0, 8)
 historyPadding.Parent = historyBox
 
-local clearHistoryBtn = UI.createButton(configPanel, "🗑️ Limpiar Historial", UDim2.new(0, 0, 0, 320), UDim2.new(1, 0, 0, 40), Color3.fromRGB(244, 67, 54))
+local clearHistoryBtn = UI.createButton(configPanel, "🗑️ Limpiar Historial", UDim2.new(0, 0, 0, 370), UDim2.new(1, 0, 0, 40), Color3.fromRGB(244, 67, 54))
 
 -- Información
-UI.createLabel(configPanel, "ℹ️ Información del Plugin:", UDim2.new(0, 0, 0, 370))
+UI.createLabel(configPanel, "ℹ️ Información del Plugin:", UDim2.new(0, 0, 0, 420))
 local infoBox = Instance.new("TextLabel")
 infoBox.Size = UDim2.new(1, 0, 0, 120)
-infoBox.Position = UDim2.new(0, 0, 0, 400)
+infoBox.Position = UDim2.new(0, 0, 0, 450)
 infoBox.BackgroundColor3 = Color3.fromRGB(33, 150, 243)
 infoBox.BackgroundTransparency = 0.2
 infoBox.BorderSizePixel = 0
-infoBox.Text = "v3.0 - Mejorado\nHTTP Retry: " .. MAX_RETRIES .. "x\nTimeout: " .. REQUEST_TIMEOUT .. "s\nHistorial: últimas " .. HISTORY_SIZE .. " generaciones"
+infoBox.Text = "v3.0 - Mejorado\nHTTP Retry: " .. MAX_RETRIES .. "x\nTimeout: " .. REQUEST_TIMEOUT .. "s\nHistorial: últimas " .. HISTORY_SIZE .. " generaciones\nUserId: " .. (state.userId ~= 0 and state.userId or "No detectado")
 infoBox.TextColor3 = Color3.fromRGB(255, 255, 255)
 infoBox.TextSize = 12
 infoBox.Font = Enum.Font.Gotham
@@ -407,6 +429,24 @@ local function updateStatus(message, isError)
 	Logger.log(message)
 end
 
+local function resetSession()
+	state.sessionId = generateUUID()
+	Storage.set("sessionId", state.sessionId)
+	state.currentPrompt = ""
+	state.currentQuestions = {}
+	currentQuestions = {}
+	state.isGenerating = false
+	promptBox.Text = ""
+	questionsContainer.Visible = false
+	generateCodeBtn.Visible = false
+	for _, box in ipairs(questionBoxes) do
+		box:Destroy()
+	end
+	questionBoxes = {}
+	updateStatus("🆕 Nueva sesión iniciada", false)
+	Logger.log("Nueva sesión: " .. state.sessionId)
+end
+
 -- Generar preguntas
 local function generateQuestions()
 	if state.isGenerating then
@@ -434,7 +474,8 @@ local function generateQuestions()
 	
 	task.spawn(function()
 		local requestBody = HttpService:JSONEncode({
-			prompt = prompt
+			prompt = prompt,
+			userId = state.userId
 		})
 		
 		local response = Http.request(state.backendUrl .. "/api/clarify/generate-questions", "POST", requestBody)
@@ -522,7 +563,8 @@ local function generateCode()
 			systemType = state.currentSystemType,
 			questions = currentQuestions,
 			answers = answers,
-			sessionId = state.sessionId
+			sessionId = state.sessionId,
+			userId = state.userId
 		})
 		
 		local response = Http.request(state.backendUrl .. "/api/clarify", "POST", requestBody)
@@ -636,6 +678,11 @@ saveUrlBtn.MouseButton1Click:Connect(function()
 	state.backendUrl = url
 	Storage.set("backendUrl", url)
 	updateStatus("✅ URL guardada: " .. url, false)
+end)
+
+-- Nueva sesión
+newSessionBtn.MouseButton1Click:Connect(function()
+	resetSession()
 end)
 
 -- Limpiar historial
@@ -925,7 +972,8 @@ local function generateQuestions()
 		local url = backendUrl .. "/api/clarify/generate-questions"
 		
 		local requestBody = HttpService:JSONEncode({
-			prompt = prompt
+			prompt = prompt,
+			userId = resolveUserId()
 		})
 		
 		local success, response = pcall(function()
@@ -1047,7 +1095,8 @@ local function generateCode()
 			systemType = currentSystemType,
 			questions = currentQuestions,
 			answers = answers,
-			sessionId = sessionId
+			sessionId = sessionId,
+			userId = resolveUserId()
 		})
 		
 		local success, response = pcall(function()
