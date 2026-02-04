@@ -4,14 +4,12 @@
 
 import express from 'express';
 import ClarificationManager from '../services/clarificationManager.js';
-import Generator from '../services/generator.js';
-import ErrorLogger from '../services/errorLogger.js';
+import { generateSystem } from '../services/generator.js';
+import { ErrorLogger, RetryManager } from '../services/errorLogger.js';
 import { classifyPrompt } from '../services/classifier.js';
 
 const router = express.Router();
 const clarificationManager = new ClarificationManager();
-const generator = new Generator();
-const errorLogger = new ErrorLogger();
 
 /**
  * POST /api/clarify
@@ -61,20 +59,14 @@ router.post('/', async (req, res) => {
     }
 
     // Registrar solicitud de clarificación
-    errorLogger.logRequest({
+    ErrorLogger.logInfo('Clarification request', {
       prompt: originalPrompt,
-      clarifiedPrompt: enhancedPrompt,
       systemType: detectedType,
-      hasContext: true,
-      sessionId
+      hasContext: true
     });
 
     // Generar código con contexto completo
-    const result = await generator.generateCode(
-      enhancedPrompt,
-      detectedType,
-      { retries: 3 }
-    );
+    const result = await generateSystem(detectedType, enhancedPrompt, sessionId);
 
     if (result.success) {
       return res.json({
@@ -87,12 +79,8 @@ router.post('/', async (req, res) => {
       });
     } else {
       // Si hay error, loguear y retornar
-      errorLogger.logError({
-        type: 'generation_error',
-        message: result.error,
+      ErrorLogger.logError('Generation failed', new Error(result.message), {
         prompt: enhancedPrompt,
-        suggestion: result.suggestion,
-        retriable: result.canRetry,
         systemType: detectedType
       });
 
@@ -107,11 +95,7 @@ router.post('/', async (req, res) => {
   } catch (error) {
     console.error('Error en /clarify:', error);
 
-    errorLogger.logError({
-      type: 'clarification_error',
-      message: error.message,
-      stack: error.stack
-    });
+    ErrorLogger.logError('Clarification endpoint error', error, {});
 
     res.status(500).json({
       success: false,
