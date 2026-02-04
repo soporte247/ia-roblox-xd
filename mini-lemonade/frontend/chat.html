@@ -576,14 +576,26 @@
       }
     }
 
-    // Send message
+    // Send message with retry logic
     async function sendMessage() {
       const message = messageInput.value.trim();
       const rawSystemType = document.getElementById('systemType').value;
       const systemType = rawSystemType ? rawSystemType.toLowerCase() : null;
 
+      // Validate input
       if (!message) {
         showToast('Por favor escribe algo', 'error');
+        messageInput.focus();
+        return;
+      }
+
+      if (message.length < 3) {
+        showToast('La descripción debe tener al menos 3 caracteres', 'error');
+        return;
+      }
+
+      if (message.length > 1000) {
+        showToast('La descripción no puede exceder 1000 caracteres', 'error');
         return;
       }
 
@@ -594,50 +606,163 @@
 
       // Show loading indicator
       const loadingId = showLoading();
+      
+      // Send message with retry
+      await sendMessageWithRetry(
+        message, 
+        systemType, 
+        getUserId(), 
+        loadingId, 
+        3 // max retries
+      );
+    }
 
-      try {
-        const response = await fetch('/generate', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            prompt: message,
-            userId: getUserId(),
-            ...(systemType ? { systemType } : {})
-          })
-        });
+    async function sendMessageWithRetry(prompt, systemType, userId, loadingId, maxRetries = 3) {
+      let attempt = 0;
+      let lastError = null;
 
-        removeMessage(loadingId);
+      while (attempt < maxRetries) {
+        try {
+          attempt++;
+          console.log(`[Send Message] Attempt ${attempt}/${maxRetries}`);
 
-        if (!response.ok) {
-          throw new Error('Error generating code');
+          const response = await fetch('/generate', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            timeout: 60000,
+            body: JSON.stringify({
+              prompt: prompt,
+              userId: userId,
+              ...(systemType ? { systemType } : {})
+            })
+          });
+
+          const data = await response.json();
+
+          // Success
+          if (data.success) {
+            removeMessage(loadingId);
+            showGenerationSuccess(data);
+            return;
+          }
+
+          // Error from server
+          lastError = {
+            message: data.error || 'Error desconocido',
+            suggestion: data.suggestion,
+            canRetry: data.canRetry !== false,
+            code: data.code
+          };
+
+          // Non-retriable error
+          if (!lastError.canRetry) {
+            removeMessage(loadingId);
+            showGenerationError(lastError, false);
+            return;
+          }
+
+          // Retriable error - wait and retry
+          if (attempt < maxRetries) {
+            const delay = 1000 * Math.pow(2, attempt - 1); // Exponential backoff: 1s, 2s, 4s
+            console.log(`[Send Message] Retrying in ${delay}ms...`);
+            
+            // Update loading message
+            const loadingMsg = document.getElementById(loadingId);
+            if (loadingMsg) {
+              loadingMsg.querySelector('.message-content').textContent = 
+                `Intentando nuevamente (${attempt}/${maxRetries - 1})...`;
+            }
+
+            await new Promise(resolve => setTimeout(resolve, delay));
+            continue;
+          }
+
+          // Last attempt failed
+          removeMessage(loadingId);
+          showGenerationError(lastError, false);
+          return;
+
+        } catch (networkError) {
+          console.error(`[Send Message] Attempt ${attempt} failed:`, networkError);
+          lastError = {
+            message: 'Error de conexión. Por favor intenta de nuevo.',
+            suggestion: 'Verifica tu conexión a internet e intenta nuevamente.',
+            canRetry: attempt < maxRetries,
+            code: 'NETWORK_ERROR'
+          };
+
+          // Network error - can retry
+          if (attempt < maxRetries) {
+            const delay = 1000 * attempt;
+            const loadingMsg = document.getElementById(loadingId);
+            if (loadingMsg) {
+              loadingMsg.querySelector('.message-content').textContent = 
+                `Reconectando (${attempt}/${maxRetries})...`;
+            }
+            await new Promise(resolve => setTimeout(resolve, delay));
+            continue;
+          }
+
+          // Failed all attempts
+          removeMessage(loadingId);
+          showGenerationError(lastError, true);
+          return;
         }
-
-        const data = await response.json();
-        
-        // Show AI response with code
-        const aiMessage = document.createElement('div');
-        aiMessage.className = 'message ai';
-        aiMessage.innerHTML = `
-          <div class="message-content">
-            <p>${data.result || 'Sistema generado exitosamente'}</p>
-            ${data.code ? `
-              <div class="code-block">${escapeHtml(data.code)}</div>
-              <div class="code-actions">
-                <button class="code-btn" onclick="copyCode('${btoa(data.code)}')">📋 Copiar</button>
-                <button class="code-btn" onclick="downloadCode('${btoa(data.code)}')">⬇️ Descargar</button>
-              </div>
-            ` : ''}
-          </div>
-        `;
-        document.getElementById('chatMessages').appendChild(aiMessage);
-        scrollToBottom();
-
-      } catch (error) {
-        console.error('Error:', error);
-        showToast('Error al generar código: ' + error.message, 'error');
       }
+
+      // Should not reach here
+      removeMessage(loadingId);
+      showGenerationError(lastError || { message: 'Error desconocido' }, false);
+    }
+
+    function showGenerationSuccess(data) {
+      const aiMessage = document.createElement('div');
+      aiMessage.className = 'message ai';
+      
+      const filesInfo = data.result?.files?.length 
+        ? `✅ ${data.result.files.length} archivo(s) generado(s) usando ${data.result.method || 'template'}`
+        : `✅ Sistema generado exitosamente`;
+
+      aiMessage.innerHTML = `
+        <div class="message-content">
+          <p><strong>${filesInfo}</strong></p>
+          <small style="opacity: 0.7;">Tiempo: ${data.duration || 'unknown'}</small>
+          <div style="margin-top: 10px; padding: 10px; background: rgba(76, 175, 80, 0.2); border-radius: 6px; border-left: 3px solid #4caf50;">
+            <p>✨ Tu código ha sido generado y guardado correctamente.</p>
+            <p style="font-size: 0.9em; margin-top: 5px;">Revisa tu historial para ver los archivos generados.</p>
+          </div>
+        </div>
+      `;
+      document.getElementById('chatMessages').appendChild(aiMessage);
+      scrollToBottom();
+    }
+
+    function showGenerationError(error, isNetworkError) {
+      const aiMessage = document.createElement('div');
+      aiMessage.className = 'message ai';
+      
+      const errorIcon = isNetworkError ? '🌐' : '⚠️';
+      const title = isNetworkError ? 'Error de Conexión' : 'Error en la Generación';
+
+      aiMessage.innerHTML = `
+        <div class="message-content">
+          <p><strong>${errorIcon} ${title}</strong></p>
+          <p style="margin: 10px 0;">${escapeHtml(error.message)}</p>
+          ${error.suggestion ? `
+            <div style="margin-top: 10px; padding: 10px; background: rgba(33, 150, 243, 0.2); border-radius: 6px; border-left: 3px solid #2196f3;">
+              <p style="font-size: 0.9em;"><strong>💡 Sugerencia:</strong> ${escapeHtml(error.suggestion)}</p>
+            </div>
+          ` : ''}
+          <div style="margin-top: 10px; display: flex; gap: 8px;">
+            <button class="code-btn" onclick="document.getElementById('messageInput').focus()">🔄 Intentar de Nuevo</button>
+            ${error.code ? `<small style="opacity: 0.6; padding-top: 8px;">Código: ${error.code}</small>` : ''}
+          </div>
+        </div>
+      `;
+      document.getElementById('chatMessages').appendChild(aiMessage);
+      scrollToBottom();
     }
 
     function addMessage(text, sender) {

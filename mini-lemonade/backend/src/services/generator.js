@@ -2,10 +2,12 @@ import fs from 'fs';
 import path from 'path';
 import OpenAI from 'openai';
 import { saveToHistory } from '../routes/history.js';
+import ResponseValidator from './validator.js';
+import { ErrorLogger, RetryManager } from './errorLogger.js';
 
 // Configuration
 const OLLAMA_TIMEOUT = 60000; // 60 seconds
-const OLLAMA_MAX_RETRIES = 2;
+const OLLAMA_MAX_RETRIES = 3;
 const openai = process.env.OPENAI_API_KEY
   ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
   : null;
@@ -22,24 +24,44 @@ function logError(message, error = {}) {
 }
 
 export async function generateSystem(type, prompt = '', userId = 'default') {
+  const startTime = Date.now();
   logInfo('Starting generation', { type, userId, hasPrompt: !!prompt });
   
   const supportedTypes = ['attack', 'shop', 'ui', 'inventory', 'quest'];
   
   if (!supportedTypes.includes(type)) {
-    logError('Unsupported system type', { type });
+    ErrorLogger.logError('Unsupported system type', 
+      new Error(`Type not in ${supportedTypes.join(',')}`), 
+      { type, userId }
+    );
     return {
       success: false,
       message: `Sistema "${type}" no reconocido. Tipos disponibles: ${supportedTypes.join(', ')}`,
+      code: 'INVALID_TYPE'
     };
   }
 
   // Validate userId
   if (!userId || userId === 'default') {
-    logError('Invalid userId', { userId });
+    ErrorLogger.logError('Invalid userId', new Error('Invalid userId'), { userId });
     return {
       success: false,
       message: 'UserId inválido. Proporciona un UUID válido.',
+      code: 'INVALID_USERID'
+    };
+  }
+
+  // Sanitize and validate prompt
+  try {
+    prompt = ResponseValidator.sanitizePrompt(prompt);
+  } catch (error) {
+    const errorDetails = ResponseValidator.getDetailedErrorMessage(error);
+    ErrorLogger.logError('Prompt validation failed', error, { userId, type });
+    return {
+      success: false,
+      message: errorDetails.userMessage,
+      suggestion: errorDetails.suggestedFix,
+      code: 'INVALID_PROMPT'
     };
   }
 
@@ -50,81 +72,140 @@ export async function generateSystem(type, prompt = '', userId = 'default') {
   try {
     fs.mkdirSync(baseDir, { recursive: true });
   } catch (error) {
-    logError('Failed to create directory', { baseDir, error: error.message });
+    ErrorLogger.logError('Failed to create directory', error, { baseDir, userId, type });
     return {
       success: false,
       message: 'Error al crear directorio de salida',
+      code: 'DIR_CREATE_ERROR'
     };
   }
 
   let files;
   let generationMethod = 'template';
+  let lastError = null;
 
-  try {
-    if (openai) {
-      logInfo('Using OpenAI for generation');
-      files = await generateWithOpenAI(prompt, type);
-      generationMethod = 'openai';
-    } else if (ollamaModel) {
-      logInfo('Using Ollama for generation');
-      files = await generateWithOllama(prompt, type);
-      generationMethod = 'ollama';
-    } else {
-      logInfo('Using default template');
+  // Try to generate with AI (with retry logic)
+  if (process.env.OPENAI_API_KEY || process.env.OLLAMA_MODEL) {
+    try {
+      if (process.env.OPENAI_API_KEY) {
+        logInfo('Using OpenAI for generation');
+        files = await RetryManager.executeWithRetry(
+          () => generateWithOpenAI(prompt, type),
+          2, // max 2 retries for OpenAI
+          1000
+        );
+        generationMethod = 'openai';
+      } else if (process.env.OLLAMA_MODEL) {
+        logInfo('Using Ollama for generation');
+        files = await RetryManager.executeWithRetry(
+          () => generateWithOllama(prompt, type),
+          OLLAMA_MAX_RETRIES,
+          1000
+        );
+        generationMethod = 'ollama';
+      }
+    } catch (error) {
+      lastError = error;
+      ErrorLogger.logError('AI generation failed, falling back to template', error, { 
+        userId, type, method: generationMethod 
+      });
       files = getDefaultTemplate(type);
+      generationMethod = 'template-fallback';
     }
-  } catch (error) {
-    logError('Generation failed, falling back to template', { error: error.message });
+  } else {
+    logInfo('Using default template (no AI configured)');
     files = getDefaultTemplate(type);
-    generationMethod = 'template-fallback';
   }
 
   // Validate files object
   if (!files || typeof files !== 'object' || Object.keys(files).length === 0) {
-    logError('Invalid files object, using template', { files });
+    ErrorLogger.logError('Invalid files object, using template', 
+      new Error('No valid files returned'), 
+      { userId, type }
+    );
     files = getDefaultTemplate(type);
     generationMethod = 'template-fallback';
   }
 
-  // Write files to disk
-  let writtenFiles = 0;
+  // Validate each file
+  const defaultTemplate = getDefaultTemplate(type);
+  const validFiles = {};
+  
   for (const [name, content] of Object.entries(files)) {
     try {
       if (typeof content !== 'string') {
         logError('Invalid file content type', { name, type: typeof content });
         continue;
       }
+      // Validate Lua syntax
+      ResponseValidator.validateLuaCode(content, name);
+      validFiles[name] = content;
+    } catch (error) {
+      ErrorLogger.logError(`Lua validation failed for ${name}`, error, { userId, type });
+      logError(`File validation failed: ${error.message}`, { name });
+      // Continue with other files
+    }
+  }
+
+  // If no valid files were found, use template
+  if (Object.keys(validFiles).length === 0) {
+    logError('No valid files after validation, using template');
+    validFiles = defaultTemplate;
+    generationMethod = 'template-fallback';
+  }
+
+  // Write files to disk
+  let writtenFiles = 0;
+  const writtenFileNames = [];
+  
+  for (const [name, content] of Object.entries(validFiles)) {
+    try {
       const filePath = path.join(baseDir, name);
       fs.writeFileSync(filePath, content, 'utf8');
       writtenFiles++;
+      writtenFileNames.push(name);
     } catch (error) {
+      ErrorLogger.logError('Failed to write file', error, { name, filePath: baseDir, userId, type });
       logError('Failed to write file', { name, error: error.message });
     }
   }
 
   if (writtenFiles === 0) {
-    logError('No files were written');
+    ErrorLogger.logError('No files were written', new Error('Write failure'), { userId, type });
     return {
       success: false,
       message: 'Error al escribir archivos generados',
+      code: 'WRITE_ERROR'
     };
   }
 
   // Save to history
   try {
-    await saveToHistory(userId, type, prompt, files);
+    await saveToHistory(userId, type, prompt, validFiles);
   } catch (error) {
-    logError('Failed to save to history', { error: error.message });
+    ErrorLogger.logError('Failed to save to history', error, { userId, type });
+    // Don't fail generation if history save fails
   }
 
-  logInfo('Generation completed', { method: generationMethod, filesWritten: writtenFiles });
+  const duration = Date.now() - startTime;
+  ErrorLogger.logRequest('generateSystem', userId, type, duration, true, { 
+    method: generationMethod,
+    filesWritten: writtenFiles
+  });
+
+  logInfo('Generation completed', { 
+    method: generationMethod, 
+    filesWritten: writtenFiles,
+    duration: `${duration}ms`
+  });
 
   return {
     success: true,
     message: `${systemName} generated successfully using ${generationMethod}`,
-    files: Object.keys(files),
+    files: writtenFileNames,
     directory: baseDir,
     method: generationMethod,
+    duration: `${duration}ms`
   };
 }
 
@@ -155,25 +236,33 @@ async function generateWithOpenAI(prompt, type = 'attack') {
 
 Generate a complete, production-ready ${type} system based on the user's requirements.
 
-IMPORTANT RULES:
-1. Return ONLY valid JSON, no markdown, no explanations, no code blocks
-2. Use Roblox best practices (RemoteEvents, proper service architecture)
-3. Include detailed comments explaining key functionality
-4. Make code modular and maintainable
-5. Add sanity checks and error handling
-6. Follow Roblox naming conventions
+CRITICAL RULES:
+1. Return ONLY valid JSON wrapped in {}
+2. Start with { and end with } - NO markdown blocks, NO explanations before/after
+3. Use Roblox best practices (RemoteEvents, proper service architecture)
+4. Include detailed comments explaining key functionality
+5. Make code modular and maintainable
+6. Add sanity checks and error handling
+7. Follow Roblox naming conventions
+8. Ensure balanced parentheses, brackets, and braces
+9. Include server AND client code when needed
 
 Required JSON format:
 {
   "files": {
-    "ServiceName.lua": "-- Server-side code here",
-    "ClientScript.lua": "-- Client-side code here"
+    "ServiceName.lua": "-- Complete server-side code here",
+    "ClientScript.lua": "-- Complete client-side code here"
   }
 }
 
-All values must be complete, working Lua code as strings. Generate at least 3-4 files.`;
+VALIDATION REQUIREMENTS:
+- All Lua code must have balanced braces, brackets, parentheses
+- Every function must have a matching 'end'
+- All strings must be properly quoted
+- Code must be syntactically valid Lua
+- Generate minimum 3-4 files for a complete system`;
 
-  const userMessage = `Create a ${type} system with these requirements: ${prompt}`;
+  const userMessage = `Create a ${type} system with these specific requirements: ${prompt}\n\nReturn ONLY JSON, starting with { and ending with }. No markdown, no explanations.`;
 
   try {
     logInfo('Calling OpenAI API');
@@ -184,8 +273,9 @@ All values must be complete, working Lua code as strings. Generate at least 3-4 
         { role: 'system', content: systemMessage },
         { role: 'user', content: userMessage },
       ],
-      temperature: 0.2,
-      max_tokens: 3000,
+      temperature: 0.1, // Lower temperature for more consistent format
+      max_tokens: 4000,
+      top_p: 0.95,
     });
 
     const content = response.choices?.[0]?.message?.content?.trim();
@@ -194,62 +284,52 @@ All values must be complete, working Lua code as strings. Generate at least 3-4 
       throw new Error('Empty response from OpenAI');
     }
 
-    // Remove markdown code blocks if present
-    let cleaned = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+    // Validate and parse response
+    const files = ResponseValidator.validateJsonResponse(content, type);
     
-    // Try to extract JSON if there's extra text
-    const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      cleaned = jsonMatch[0];
-    }
-    
-    const parsed = JSON.parse(cleaned);
-    
-    if (!parsed.files || typeof parsed.files !== 'object') {
-      throw new Error('Invalid JSON structure from OpenAI');
-    }
-    
-    logInfo('OpenAI generation successful', { fileCount: Object.keys(parsed.files).length });
-    return parsed.files;
+    logInfo('OpenAI generation successful', { fileCount: Object.keys(files).length });
+    return files;
     
   } catch (error) {
     logError('OpenAI generation failed', { error: error.message });
-    return getDefaultTemplate(type);
+    throw error; // Let retry logic handle this
   }
 }
 
 async function generateWithOllama(prompt, type = 'attack') {
-  const systemMessage = `You are an expert Roblox Lua engineer specializing in scalable game systems.
+  const systemMessage = `You are an expert Roblox Lua engineer. Generate ONLY valid JSON, nothing else.
 
-Generate a complete, production-ready ${type} system based on the user's requirements.
+CRITICAL: Return ONLY JSON starting with { and ending with }. No markdown, no explanations.
 
-IMPORTANT RULES:
-1. Return ONLY valid JSON, no markdown, no explanations
-2. Use Roblox best practices (RemoteEvents, proper service architecture)
-3. Include comments explaining key functionality
-4. Make code modular and maintainable
-5. Add sanity checks and error handling
+${type} system requirements:
+- Return valid JSON format exactly as specified
+- Use Roblox best practices
+- Include detailed comments
+- Make code modular
+- Ensure all code is syntactically valid Lua
+- Balance all brackets and braces
+- Every function must have an end
+- Generate 3-4 files minimum
 
-Required JSON format:
+JSON Format:
 {
   "files": {
-    "ServiceName.lua": "-- Server-side code here",
-    "ClientScript.lua": "-- Client-side code here"
+    "ServiceName.lua": "-- Server code",
+    "ClientScript.lua": "-- Client code"
   }
-}
-
-All values must be complete, working Lua code as strings.`;
+}`;
 
   const payload = {
-    model: ollamaModel,
+    model: process.env.OLLAMA_MODEL,
     messages: [
       { role: 'system', content: systemMessage },
-      { role: 'user', content: `Create a ${type} system: ${prompt}` },
+      { role: 'user', content: `${type} system: ${prompt}\n\nReturn ONLY JSON, nothing else.` },
     ],
     stream: false,
     options: {
-      temperature: 0.2,
-      num_predict: 2000,
+      temperature: 0.1,
+      num_predict: 3000,
+      top_p: 0.95,
     },
   };
 
@@ -260,7 +340,7 @@ All values must be complete, working Lua code as strings.`;
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), OLLAMA_TIMEOUT);
 
-      const response = await fetch(`${ollamaBaseUrl}/api/chat`, {
+      const response = await fetch(`${process.env.OLLAMA_BASE_URL || 'http://localhost:11434'}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -280,27 +360,11 @@ All values must be complete, working Lua code as strings.`;
         throw new Error('Empty Ollama response');
       }
 
-      // Remove markdown code blocks if present
-      let cleaned = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      // Validate and parse response
+      const files = ResponseValidator.validateJsonResponse(content, type);
       
-      // Try to find JSON object if response has extra text
-      const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        cleaned = jsonMatch[0];
-      }
-      
-      const parsed = JSON.parse(cleaned);
-      
-      if (!parsed.files || typeof parsed.files !== 'object') {
-        throw new Error('Invalid JSON structure: missing or invalid files object');
-      }
-      
-      if (Object.keys(parsed.files).length === 0) {
-        throw new Error('Empty files object in response');
-      }
-      
-      logInfo('Ollama generation successful', { fileCount: Object.keys(parsed.files).length });
-      return parsed.files;
+      logInfo('Ollama generation successful', { fileCount: Object.keys(files).length });
+      return files;
       
     } catch (error) {
       if (error.name === 'AbortError') {
@@ -311,15 +375,17 @@ All values must be complete, working Lua code as strings.`;
       
       // If not last attempt, wait before retrying
       if (attempt < OLLAMA_MAX_RETRIES) {
-        const delay = 1000 * attempt; // Exponential backoff
+        const delay = 1000 * attempt;
         logInfo(`Retrying in ${delay}ms...`);
         await new Promise(resolve => setTimeout(resolve, delay));
+      } else {
+        // Last attempt failed
+        throw error;
       }
     }
   }
 
-  logError('All Ollama attempts failed, using template');
-  return getDefaultTemplate(type);
+  throw new Error('All Ollama attempts failed');
 }
 
 function attackServiceLua() {
