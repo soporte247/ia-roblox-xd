@@ -34,18 +34,7 @@ console.log(`📁 Ruta de base de datos: ${dbPath}`);
 const db = new sqlite3.Database(dbPath, (err) => {
   if (err) {
     console.error('❌ Error opening database:', err);
-    console.log('⚠️ Usando base de datos en memoria como fallback');
-  } else {
-    console.log('✅ SQLite database connected');
-  }
-});
-        if (err) {
-          console.error('❌ Error de reconexión:', err);
-        } else {
-          console.log('✅ Base de datos reconectada');
-        }
-      });
-    }, 5000);
+    console.log('⚠️ Intentando usar /tmp/database.sqlite como fallback');
   } else {
     console.log('✅ SQLite database connected');
   }
