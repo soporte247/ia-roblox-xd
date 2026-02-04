@@ -1,39 +1,38 @@
--- DataShark IA - Roblox Studio Plugin
--- Enhanced UI version with visual interface
+-- DataShark IA - Roblox Studio Plugin v2.0
+-- Sistema de clarificación integrado con IA
 
 local HttpService = game:GetService('HttpService')
 local ServerScriptService = game:GetService('ServerScriptService')
 local ChangeHistoryService = game:GetService('ChangeHistoryService')
 
 -- Configuration
-local DEFAULT_URL = "http://localhost:3000"
+local DEFAULT_URL = "https://datashark-ia2.onrender.com"
 local MAX_RETRIES = 3
 local RETRY_DELAY = 1
-local CONNECTION_TIMEOUT = 10
 
 -- Create UI
 local toolbar = plugin:CreateToolbar("DataShark IA")
 local button = toolbar:CreateButton(
-	"Import System",
-	"Import generated Lua systems from DataShark IA",
-	"rbxassetid://0" -- You can add an icon here
+	"Generate System",
+	"Generate Lua systems with AI clarification",
+	"rbxassetid://0"
 )
 
 -- Create DockWidget
 local widgetInfo = DockWidgetPluginGuiInfo.new(
 	Enum.InitialDockState.Float,
-	false,   -- Initially enabled
-	false,   -- Don't override previous enabled state
-	400,     -- Default width
-	500,     -- Default height
-	300,     -- Min width
-	400      -- Min height
+	false,
+	false,
+	450,
+	650,
+	400,
+	500
 )
 
 local widget = plugin:CreateDockWidgetPluginGui("DataSharkWidget", widgetInfo)
 widget.Title = "🦈 DataShark IA"
 
--- Create UI Elements
+-- Create Main Frame
 local mainFrame = Instance.new("Frame")
 mainFrame.Size = UDim2.new(1, 0, 1, 0)
 mainFrame.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
@@ -43,7 +42,7 @@ mainFrame.Parent = widget
 -- Header
 local header = Instance.new("Frame")
 header.Size = UDim2.new(1, 0, 0, 60)
-header.BackgroundColor3 = Color3.fromRGB(30, 136, 229) -- Blue shark theme
+header.BackgroundColor3 = Color3.fromRGB(30, 136, 229)
 header.BorderSizePixel = 0
 header.Parent = mainFrame
 
@@ -51,14 +50,14 @@ local title = Instance.new("TextLabel")
 title.Size = UDim2.new(1, -20, 1, 0)
 title.Position = UDim2.new(0, 10, 0, 0)
 title.BackgroundTransparency = 1
-title.Text = "🦈 DataShark IA"
+title.Text = "🦈 DataShark IA v2.0"
 title.TextColor3 = Color3.fromRGB(255, 255, 255)
 title.TextSize = 24
 title.Font = Enum.Font.GothamBold
 title.TextXAlignment = Enum.TextXAlignment.Left
 title.Parent = header
 
--- Content Frame
+-- Content ScrollFrame
 local content = Instance.new("ScrollingFrame")
 content.Size = UDim2.new(1, -20, 1, -80)
 content.Position = UDim2.new(0, 10, 0, 70)
@@ -69,208 +68,143 @@ content.AutomaticCanvasSize = Enum.AutomaticSize.Y
 content.ScrollBarThickness = 6
 content.Parent = mainFrame
 
--- User ID Section
-local userIdLabel = Instance.new("TextLabel")
-userIdLabel.Size = UDim2.new(1, 0, 0, 30)
-userIdLabel.BackgroundTransparency = 1
-userIdLabel.Text = "User ID:"
-userIdLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-userIdLabel.TextSize = 16
-userIdLabel.Font = Enum.Font.Gotham
-userIdLabel.TextXAlignment = Enum.TextXAlignment.Left
-userIdLabel.Parent = content
+local yOffset = 0
 
-local userIdBox = Instance.new("TextBox")
-userIdBox.Size = UDim2.new(1, 0, 0, 40)
-userIdBox.Position = UDim2.new(0, 0, 0, 35)
-userIdBox.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-userIdBox.BorderSizePixel = 0
-userIdBox.Text = ""
-userIdBox.PlaceholderText = "Paste your User ID here..."
-userIdBox.TextColor3 = Color3.fromRGB(255, 255, 255)
-userIdBox.PlaceholderColor3 = Color3.fromRGB(150, 150, 150)
-userIdBox.TextSize = 14
-userIdBox.Font = Enum.Font.Code
-userIdBox.ClearTextOnFocus = false
-userIdBox.Parent = content
+-- Helper to create labels
+local function createLabel(text, yPos)
+	local label = Instance.new("TextLabel")
+	label.Size = UDim2.new(1, 0, 0, 25)
+	label.Position = UDim2.new(0, 0, 0, yPos)
+	label.BackgroundTransparency = 1
+	label.Text = text
+	label.TextColor3 = Color3.fromRGB(255, 255, 255)
+	label.TextSize = 14
+	label.Font = Enum.Font.GothamBold
+	label.TextXAlignment = Enum.TextXAlignment.Left
+	label.Parent = content
+	return label
+end
 
--- Corner radius for text box
-local userIdCorner = Instance.new("UICorner")
-userIdCorner.CornerRadius = UDim.new(0, 6)
-userIdCorner.Parent = userIdBox
+-- Helper to create textboxes
+local function createTextBox(placeholder, yPos, multiline)
+	local height = multiline and 80 or 40
+	local box = Instance.new("TextBox")
+	box.Size = UDim2.new(1, 0, 0, height)
+	box.Position = UDim2.new(0, 0, 0, yPos)
+	box.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+	box.BorderSizePixel = 0
+	box.Text = ""
+	box.PlaceholderText = placeholder
+	box.TextColor3 = Color3.fromRGB(255, 255, 255)
+	box.PlaceholderColor3 = Color3.fromRGB(150, 150, 150)
+	box.TextSize = 13
+	box.Font = Enum.Font.Code
+	box.ClearTextOnFocus = false
+	box.TextXAlignment = Enum.TextXAlignment.Left
+	box.TextYAlignment = Enum.TextYAlignment.Top
+	box.TextWrapped = true
+	box.MultiLine = multiline or false
+	box.Parent = content
+	
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 6)
+	corner.Parent = box
+	
+	if multiline then
+		local padding = Instance.new("UIPadding")
+		padding.PaddingLeft = UDim.new(0, 8)
+		padding.PaddingRight = UDim.new(0, 8)
+		padding.PaddingTop = UDim.new(0, 8)
+		padding.PaddingBottom = UDim.new(0, 8)
+		padding.Parent = box
+	end
+	
+	return box
+end
 
--- Padding for text box
-local userIdPadding = Instance.new("UIPadding")
-userIdPadding.PaddingLeft = UDim.new(0, 10)
-userIdPadding.PaddingRight = UDim.new(0, 10)
-userIdPadding.Parent = userIdBox
+-- Helper to create buttons
+local function createButton(text, yPos, color)
+	local btn = Instance.new("TextButton")
+	btn.Size = UDim2.new(1, 0, 0, 45)
+	btn.Position = UDim2.new(0, 0, 0, yPos)
+	btn.BackgroundColor3 = color
+	btn.BorderSizePixel = 0
+	btn.Text = text
+	btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+	btn.TextSize = 15
+	btn.Font = Enum.Font.GothamBold
+	btn.Parent = content
+	
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 6)
+	corner.Parent = btn
+	
+	return btn
+end
 
--- Info Text
-local infoText = Instance.new("TextLabel")
-infoText.Size = UDim2.new(1, 0, 0, 40)
-infoText.Position = UDim2.new(0, 0, 0, 85)
-infoText.BackgroundTransparency = 1
-infoText.Text = "Get your User ID from the web app\n(bottom right corner)"
-infoText.TextColor3 = Color3.fromRGB(200, 200, 200)
-infoText.TextSize = 12
-infoText.Font = Enum.Font.Gotham
-infoText.TextWrapped = true
-infoText.TextXAlignment = Enum.TextXAlignment.Left
-infoText.Parent = content
+-- UI Elements
+createLabel("¿Qué sistema quieres crear?", yOffset)
+yOffset = yOffset + 30
 
--- Backend URL Section
-local urlLabel = Instance.new("TextLabel")
-urlLabel.Size = UDim2.new(1, 0, 0, 25)
-urlLabel.Position = UDim2.new(0, 0, 0, 130)
-urlLabel.BackgroundTransparency = 1
-urlLabel.Text = "Backend URL (optional):"
-urlLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-urlLabel.TextSize = 14
-urlLabel.Font = Enum.Font.Gotham
-urlLabel.TextXAlignment = Enum.TextXAlignment.Left
-urlLabel.Parent = content
+local promptBox = createTextBox("Ej: sistema de ataque con daño crítico", yOffset, true)
+yOffset = yOffset + 90
 
-local urlBox = Instance.new("TextBox")
-urlBox.Size = UDim2.new(1, 0, 0, 35)
-urlBox.Position = UDim2.new(0, 0, 0, 160)
-urlBox.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-urlBox.BorderSizePixel = 0
-urlBox.Text = ""
-urlBox.PlaceholderText = "http://localhost:3000"
-urlBox.TextColor3 = Color3.fromRGB(255, 255, 255)
-urlBox.PlaceholderColor3 = Color3.fromRGB(150, 150, 150)
-urlBox.TextSize = 12
-urlBox.Font = Enum.Font.Code
-urlBox.ClearTextOnFocus = false
-urlBox.Parent = content
+local generateQuestionsBtn = createButton("🤖 Generar Preguntas", yOffset, Color3.fromRGB(30, 136, 229))
+yOffset = yOffset + 55
 
-local urlCorner = Instance.new("UICorner")
-urlCorner.CornerRadius = UDim.new(0, 6)
-urlCorner.Parent = urlBox
+-- Questions Container (initially hidden)
+local questionsContainer = Instance.new("Frame")
+questionsContainer.Size = UDim2.new(1, 0, 0, 0)
+questionsContainer.Position = UDim2.new(0, 0, 0, yOffset)
+questionsContainer.BackgroundTransparency = 1
+questionsContainer.AutomaticSize = Enum.AutomaticSize.Y
+questionsContainer.Visible = false
+questionsContainer.Parent = content
 
-local urlPadding = Instance.new("UIPadding")
-urlPadding.PaddingLeft = UDim.new(0, 10)
-urlPadding.PaddingRight = UDim.new(0, 10)
-urlPadding.Parent = urlBox
+local questionsLabel = createLabel("📋 Responde estas preguntas:", 0)
+questionsLabel.Parent = questionsContainer
 
--- Import Button
-local importBtn = Instance.new("TextButton")
-importBtn.Size = UDim2.new(1, 0, 0, 50)
-importBtn.Position = UDim2.new(0, 0, 0, 210)
-importBtn.BackgroundColor3 = Color3.fromRGB(30, 136, 229)
-importBtn.BorderSizePixel = 0
-importBtn.Text = "📥 Import System"
-importBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-importBtn.TextSize = 18
-importBtn.Font = Enum.Font.GothamBold
-importBtn.AutoButtonColor = true
-importBtn.Parent = content
+-- Will be populated dynamically
+local questionBoxes = {}
+local currentQuestions = {}
+local currentSystemType = ""
+local currentPrompt = ""
 
-local importBtnCorner = Instance.new("UICorner")
-importBtnCorner.CornerRadius = UDim.new(0, 8)
-importBtnCorner.Parent = importBtn
+-- Generate Code Button (initially hidden)
+local generateCodeBtn = createButton("✨ Generar Código", yOffset + 10, Color3.fromRGB(76, 175, 80))
+generateCodeBtn.Visible = false
 
--- Progress Bar Container
-local progressContainer = Instance.new("Frame")
-progressContainer.Size = UDim2.new(1, 0, 0, 20)
-progressContainer.Position = UDim2.new(0, 0, 0, 270)
-progressContainer.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-progressContainer.BorderSizePixel = 0
-progressContainer.Visible = false
-progressContainer.Parent = content
-
-local progressCorner = Instance.new("UICorner")
-progressCorner.CornerRadius = UDim.new(0, 10)
-progressCorner.Parent = progressContainer
-
-local progressBar = Instance.new("Frame")
-progressBar.Size = UDim2.new(0, 0, 1, 0)
-progressBar.BackgroundColor3 = Color3.fromRGB(76, 175, 80)
-progressBar.BorderSizePixel = 0
-progressBar.Parent = progressContainer
-
-local progressBarCorner = Instance.new("UICorner")
-progressBarCorner.CornerRadius = UDim.new(0, 10)
-progressBarCorner.Parent = progressBar
-
--- Status Section
-local statusLabel = Instance.new("TextLabel")
-statusLabel.Size = UDim2.new(1, 0, 0, 30)
-statusLabel.Position = UDim2.new(0, 0, 0, 300)
-statusLabel.BackgroundTransparency = 1
-statusLabel.Text = "Status:"
-statusLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-statusLabel.TextSize = 16
-statusLabel.Font = Enum.Font.Gotham
-statusLabel.TextXAlignment = Enum.TextXAlignment.Left
-statusLabel.Parent = content
+-- Status Box
+yOffset = yOffset + 70
+createLabel("Estado:", yOffset)
+yOffset = yOffset + 30
 
 local statusBox = Instance.new("TextLabel")
 statusBox.Size = UDim2.new(1, 0, 0, 100)
-statusBox.Position = UDim2.new(0, 0, 0, 335)
+statusBox.Position = UDim2.new(0, 0, 0, yOffset)
 statusBox.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 statusBox.BorderSizePixel = 0
-statusBox.Text = "Ready to import..."
-statusBox.TextColor3 = Color3.fromRGB(255, 255, 255)
-statusBox.TextSize = 14
+statusBox.Text = "✨ Listo para generar sistemas con IA"
+statusBox.TextColor3 = Color3.fromRGB(76, 175, 80)
+statusBox.TextSize = 13
 statusBox.Font = Enum.Font.Code
 statusBox.TextWrapped = true
 statusBox.TextXAlignment = Enum.TextXAlignment.Left
 statusBox.TextYAlignment = Enum.TextYAlignment.Top
 statusBox.Parent = content
 
-local statusBoxCorner = Instance.new("UICorner")
-statusBoxCorner.CornerRadius = UDim.new(0, 6)
-statusBoxCorner.Parent = statusBox
+local statusCorner = Instance.new("UICorner")
+statusCorner.CornerRadius = UDim.new(0, 6)
+statusCorner.Parent = statusBox
 
-local statusBoxPadding = Instance.new("UIPadding")
-statusBoxPadding.PaddingLeft = UDim.new(0, 10)
-statusBoxPadding.PaddingRight = UDim.new(0, 10)
-statusBoxPadding.PaddingTop = UDim.new(0, 10)
-statusBoxPadding.PaddingBottom = UDim.new(0, 10)
-statusBoxPadding.Parent = statusBox
+local statusPadding = Instance.new("UIPadding")
+statusPadding.PaddingLeft = UDim.new(0, 10)
+statusPadding.PaddingRight = UDim.new(0, 10)
+statusPadding.PaddingTop = UDim.new(0, 10)
+statusPadding.PaddingBottom = UDim.new(0, 10)
+statusPadding.Parent = statusBox
 
--- Refresh Button
-local refreshBtn = Instance.new("TextButton")
-refreshBtn.Size = UDim2.new(0.48, 0, 0, 40)
-refreshBtn.Position = UDim2.new(0, 0, 0, 450)
-refreshBtn.BackgroundColor3 = Color3.fromRGB(76, 175, 80)
-refreshBtn.BorderSizePixel = 0
-refreshBtn.Text = "🔄 Refresh"
-refreshBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-refreshBtn.TextSize = 14
-refreshBtn.Font = Enum.Font.GothamBold
-refreshBtn.Parent = content
-
-local refreshBtnCorner = Instance.new("UICorner")
-refreshBtnCorner.CornerRadius = UDim.new(0, 6)
-refreshBtnCorner.Parent = refreshBtn
-
--- Settings Button
-local settingsBtn = Instance.new("TextButton")
-settingsBtn.Size = UDim2.new(0.48, 0, 0, 40)
-settingsBtn.Position = UDim2.new(0.52, 0, 0, 450)
-settingsBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-settingsBtn.BorderSizePixel = 0
-settingsBtn.Text = "⚙️ Info"
-settingsBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-settingsBtn.TextSize = 14
-settingsBtn.Font = Enum.Font.Gotham
-settingsBtn.Parent = content
-
-local settingsBtnCorner = Instance.new("UICorner")
-settingsBtnCorner.CornerRadius = UDim.new(0, 6)
-settingsBtnCorner.Parent = settingsBtn
-
--- Plugin Data Store (save user ID and URL)
-local function saveUserId(userId)
-	plugin:SetSetting("DataSharkUserId", userId)
-end
-
-local function loadUserId()
-	return plugin:GetSetting("DataSharkUserId") or ""
-end
-
+-- Plugin Settings
 local function saveBackendUrl(url)
 	plugin:SetSetting("DataSharkUrl", url)
 end
@@ -280,73 +214,51 @@ local function loadBackendUrl()
 end
 
 local function getBackendUrl()
-	local customUrl = urlBox.Text:gsub("%s+", "")
-	return (customUrl ~= "" and customUrl) or loadBackendUrl()
+	return loadBackendUrl()
 end
 
--- Load saved settings
-userIdBox.Text = loadUserId()
-local savedUrl = loadBackendUrl()
-if savedUrl ~= DEFAULT_URL then
-	urlBox.Text = savedUrl
+-- Generate UUID
+local function generateUUID()
+	local random = math.random
+	local template = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'
+	return string.gsub(template, '[xy]', function(c)
+		local v = (c == 'x') and random(0, 0xf) or random(8, 0xb)
+		return string.format('%x', v)
+	end)
 end
 
--- Functions
-local function updateStatus(message, isError, showProgress)
+local sessionId = generateUUID()
+
+-- Update Status
+local function updateStatus(message, isError)
 	statusBox.Text = message
 	statusBox.TextColor3 = isError and Color3.fromRGB(244, 67, 54) or Color3.fromRGB(76, 175, 80)
-	
-	if showProgress ~= nil then
-		progressContainer.Visible = showProgress
-		if showProgress then
-			-- Animate progress bar
-			progressBar:TweenSize(
-				UDim2.new(1, 0, 1, 0),
-				Enum.EasingDirection.Out,
-				Enum.EasingStyle.Quad,
-				1.5,
-				true
-			)
-		else
-			progressBar.Size = UDim2.new(0, 0, 1, 0)
-		end
-	end
 end
 
-local function fetchAndCreateScripts()
-	local userId = userIdBox.Text:gsub("%s+", "")
+-- Generate Questions from AI
+local function generateQuestions()
+	local prompt = promptBox.Text:gsub("^%s*(.-)%s*$", "%1")
 	
-	if userId == "" then
-		updateStatus("❌ Error: Please enter your User ID", true, false)
+	if prompt == "" then
+		updateStatus("❌ Error: Escribe qué sistema quieres crear", true)
 		return
 	end
 	
-	-- Validate User ID format (UUID)
-	if not userId:match("^[a-fA-F0-9%-]+$") or #userId ~= 36 then
-		updateStatus("❌ Error: Invalid User ID format\nMust be a valid UUID (36 characters)", true, false)
-		return
-	end
+	currentPrompt = prompt
+	generateQuestionsBtn.Text = "⏳ Generando preguntas..."
+	generateQuestionsBtn.BackgroundColor3 = Color3.fromRGB(25, 118, 210)
+	updateStatus("🤖 La IA está analizando tu solicitud...", false)
 	
-	-- Save User ID and URL
-	saveUserId(userId)
-	if urlBox.Text ~= "" then
-		saveBackendUrl(urlBox.Text)
-	end
-	
-	updateStatus("⏳ Connecting to DataShark IA...", false, true)
-	
-	local backendUrl = getBackendUrl()
-	local url = backendUrl .. "/fetch?userId=" .. HttpService:UrlEncode(userId)
-	
-	local startTime = tick()
-	
-	for attempt = 1, MAX_RETRIES do
-		if attempt > 1 then
-			updateStatus(string.format("🔄 Retry attempt %d/%d...", attempt, MAX_RETRIES), false, true)
-		end
+	task.spawn(function()
+		local backendUrl = getBackendUrl()
+		local url = backendUrl .. "/api/clarify/generate-questions"
+		
+		local requestBody = HttpService:JSONEncode({
+			prompt = prompt
+		})
 		
 		local success, response = pcall(function()
-			return HttpService:GetAsync(url, false)
+			return HttpService:PostAsync(url, requestBody, Enum.HttpContentType.ApplicationJson)
 		end)
 		
 		if success then
@@ -354,24 +266,142 @@ local function fetchAndCreateScripts()
 				return HttpService:JSONDecode(response)
 			end)
 			
-			if not parseSuccess then
-				updateStatus("❌ Error: Invalid response from server\nMake sure backend is running", true, false)
-				return false
-			end
-			
-			if data.files and next(data.files) ~= nil then
-				updateStatus("📥 Importing files...", false, true)
+			if parseSuccess and data.success and data.questions then
+				currentQuestions = data.questions
+				currentSystemType = data.systemType or "attack"
 				
-				-- Create a folder to organize the scripts
+				-- Clear previous questions
+				for _, box in ipairs(questionBoxes) do
+					box:Destroy()
+				end
+				questionBoxes = {}
+				
+				-- Create question inputs
+				local qYOffset = 35
+				for i, question in ipairs(currentQuestions) do
+					local qLabel = Instance.new("TextLabel")
+					qLabel.Size = UDim2.new(1, 0, 0, 20)
+					qLabel.Position = UDim2.new(0, 0, 0, qYOffset)
+					qLabel.BackgroundTransparency = 1
+					qLabel.Text = string.format("%d. %s", i, question)
+					qLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+					qLabel.TextSize = 13
+					qLabel.Font = Enum.Font.Gotham
+					qLabel.TextXAlignment = Enum.TextXAlignment.Left
+					qLabel.TextWrapped = true
+					qLabel.Parent = questionsContainer
+					
+					qYOffset = qYOffset + 25
+					
+					local qBox = Instance.new("TextBox")
+					qBox.Size = UDim2.new(1, 0, 0, 35)
+					qBox.Position = UDim2.new(0, 0, 0, qYOffset)
+					qBox.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+					qBox.BorderSizePixel = 0
+					qBox.Text = ""
+					qBox.PlaceholderText = "Tu respuesta..."
+					qBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+					qBox.PlaceholderColor3 = Color3.fromRGB(150, 150, 150)
+					qBox.TextSize = 13
+					qBox.Font = Enum.Font.Code
+					qBox.ClearTextOnFocus = false
+					qBox.Parent = questionsContainer
+					
+					local qCorner = Instance.new("UICorner")
+					qCorner.CornerRadius = UDim.new(0, 6)
+					qCorner.Parent = qBox
+					
+					table.insert(questionBoxes, qBox)
+					table.insert(questionBoxes, qLabel)
+					
+					qYOffset = qYOffset + 45
+				end
+				
+				questionsContainer.Visible = true
+				generateCodeBtn.Visible = true
+				generateCodeBtn.Position = UDim2.new(0, 0, 0, questionsContainer.Position.Y.Offset + qYOffset + 10)
+				
+				updateStatus(string.format("✅ %d preguntas generadas. Responde al menos 2 para continuar.", #currentQuestions), false)
+			else
+				updateStatus("❌ Error: No se pudieron generar preguntas\n\n" .. (data.error or "Error desconocido"), true)
+			end
+		else
+			local errorMsg = tostring(response)
+			if errorMsg:find("Http requests are not enabled") then
+				updateStatus("❌ HTTP no habilitado\n\nHabilita en: Game Settings → Security → Allow HTTP Requests", true)
+			else
+				updateStatus("❌ Error de conexión:\n\n" .. errorMsg, true)
+			end
+		end
+		
+		generateQuestionsBtn.Text = "🤖 Generar Preguntas"
+		generateQuestionsBtn.BackgroundColor3 = Color3.fromRGB(30, 136, 229)
+	end)
+end
+
+-- Generate Code from Answers
+local function generateCode()
+	-- Collect answers
+	local answers = {}
+	for i = 1, #currentQuestions do
+		local box = questionBoxes[(i-1)*2 + 2]
+		if box and box:IsA("TextBox") then
+			table.insert(answers, box.Text)
+		end
+	end
+	
+	-- Validate
+	local filledCount = 0
+	for _, answer in ipairs(answers) do
+		if answer and answer:gsub("^%s*(.-)%s*$", "%1") ~= "" then
+			filledCount = filledCount + 1
+		end
+	end
+	
+	if filledCount < 2 then
+		updateStatus("❌ Error: Responde al menos 2 preguntas", true)
+		return
+	end
+	
+	generateCodeBtn.Text = "⏳ Generando código..."
+	generateCodeBtn.BackgroundColor3 = Color3.fromRGB(67, 160, 71)
+	updateStatus("✨ La IA está generando tu sistema...", false)
+	
+	task.spawn(function()
+		local backendUrl = getBackendUrl()
+		local url = backendUrl .. "/api/clarify"
+		
+		local requestBody = HttpService:JSONEncode({
+			originalPrompt = currentPrompt,
+			systemType = currentSystemType,
+			questions = currentQuestions,
+			answers = answers,
+			sessionId = sessionId
+		})
+		
+		local success, response = pcall(function()
+			return HttpService:PostAsync(url, requestBody, Enum.HttpContentType.ApplicationJson)
+		end)
+		
+		if success then
+			local parseSuccess, data = pcall(function()
+				return HttpService:JSONDecode(response)
+			end)
+			
+			if parseSuccess and data.success and data.code then
+				updateStatus("📥 Creando archivos en Studio...", false)
+				
+				-- Create folder
 				local timestamp = os.date("%Y%m%d_%H%M%S")
 				local systemFolder = Instance.new('Folder')
-				systemFolder.Name = 'DataSharkSystem_' .. timestamp
+				systemFolder.Name = 'DataShark_' .. currentSystemType .. '_' .. timestamp
 				systemFolder.Parent = ServerScriptService
 				
 				local fileCount = 0
 				local fileList = {}
 				
-				for fileName, content in pairs(data.files) do
+				-- Create scripts from generated code
+				for fileName, content in pairs(data.code) do
 					local script = Instance.new('Script')
 					script.Name = fileName:gsub(".lua", "")
 					script.Source = content
@@ -381,64 +411,41 @@ local function fetchAndCreateScripts()
 					task.wait(0.05)
 				end
 				
-				local elapsed = math.floor((tick() - startTime) * 10) / 10
 				local fileListStr = table.concat(fileList, ", ")
 				
 				updateStatus(
 					string.format(
-						"✅ Success! (%ss)\n\n%d files imported:\n%s\n\nLocation: %s",
-						elapsed,
+						"✅ ¡Sistema creado exitosamente!\n\n%d archivos: %s\n\nUbicación: %s",
 						fileCount,
 						fileListStr,
 						systemFolder:GetFullName()
 					),
-					false,
 					false
 				)
 				
-				-- Record action for undo
-				ChangeHistoryService:SetWaypoint("DataShark IA Import")
+				ChangeHistoryService:SetWaypoint("DataShark IA Generation")
 				
-				-- Flash success animation
-				importBtn.BackgroundColor3 = Color3.fromRGB(76, 175, 80)
-				task.wait(0.3)
-				importBtn.BackgroundColor3 = Color3.fromRGB(30, 136, 229)
+				-- Reset for new generation
+				task.wait(2)
+				questionsContainer.Visible = false
+				generateCodeBtn.Visible = false
+				promptBox.Text = ""
+				for _, box in ipairs(questionBoxes) do
+					box:Destroy()
+				end
+				questionBoxes = {}
+				currentQuestions = {}
 				
-				return true
 			else
-				updateStatus("⚠️ No files available yet\n\nGenerate a system first in the web app:\n" .. backendUrl, true, false)
-				return false
+				updateStatus("❌ Error generando código:\n\n" .. (data.error or data.message or "Error desconocido"), true)
 			end
 		else
-			local errorMsg = tostring(response)
-			if errorMsg:find("Http requests are not enabled") then
-				updateStatus("❌ Error: HTTP requests not enabled\n\nEnable in: Game Settings → Security → Allow HTTP Requests", true, false)
-				return false
-			elseif errorMsg:find("Timeout") or errorMsg:find("ConnectFail") then
-				if attempt < MAX_RETRIES then
-					task.wait(RETRY_DELAY)
-				end
-			else
-				updateStatus(string.format("❌ Connection failed (attempt %d/%d)\n\n%s", attempt, MAX_RETRIES, errorMsg), true, false)
-				if attempt < MAX_RETRIES then
-					task.wait(RETRY_DELAY)
-				else
-					return false
-				end
-			end
+			updateStatus("❌ Error de conexión:\n\n" .. tostring(response), true)
 		end
-	end
-	
-	updateStatus(
-		string.format(
-			"❌ Failed after %d attempts\n\nMake sure:\n1. Backend is running on %s\n2. HTTP requests are enabled\n3. No firewall blocking",
-			MAX_RETRIES,
-			backendUrl
-		),
-		true,
-		false
-	)
-	return false
+		
+		generateCodeBtn.Text = "✨ Generar Código"
+		generateCodeBtn.BackgroundColor3 = Color3.fromRGB(76, 175, 80)
+	end)
 end
 
 -- Button Events
@@ -446,74 +453,21 @@ button.Click:Connect(function()
 	widget.Enabled = not widget.Enabled
 end)
 
-importBtn.MouseButton1Click:Connect(function()
-	if importBtn.Text:find("⏳") then
-		return -- Already importing
-	end
-	
-	importBtn.Text = "⏳ Importing..."
-	importBtn.BackgroundColor3 = Color3.fromRGB(25, 118, 210)
-	
-	task.spawn(function()
-		local success = fetchAndCreateScripts()
-		task.wait(0.5)
-		importBtn.Text = "📥 Import System"
-		importBtn.BackgroundColor3 = Color3.fromRGB(30, 136, 229)
-	end)
-end)
-
-refreshBtn.MouseButton1Click:Connect(function()
-	if refreshBtn.Text:find("⏳") then
+generateQuestionsBtn.MouseButton1Click:Connect(function()
+	if generateQuestionsBtn.Text:find("⏳") then
 		return
 	end
-	
-	refreshBtn.Text = "⏳ Checking..."
-	refreshBtn.BackgroundColor3 = Color3.fromRGB(67, 160, 71)
-	
-	task.spawn(function()
-		updateStatus("🔄 Checking for new files...", false, true)
-		local success = fetchAndCreateScripts()
-		task.wait(0.3)
-		refreshBtn.Text = "🔄 Refresh"
-		refreshBtn.BackgroundColor3 = Color3.fromRGB(76, 175, 80)
-	end)
+	generateQuestions()
 end)
 
-settingsBtn.MouseButton1Click:Connect(function()
-	local currentUrl = getBackendUrl()
-	local httpEnabled = pcall(function()
-		return HttpService:GetAsync("https://www.google.com", false)
-	end)
-	
-	local httpStatus = httpEnabled and "✅ Enabled" or "❌ Disabled"
-	
-	updateStatus(
-		string.format(
-			"🛠️ DataShark IA Info\n\nBackend URL:\n%s\n\nHTTP Requests: %s\n\nVersion: 1.0.0\nPlugin: DataShark IA",
-			currentUrl,
-			httpStatus
-		),
-		false,
-		false
-	)
-end)
-
--- Auto-save User ID and URL when changed
-userIdBox.FocusLost:Connect(function()
-	if userIdBox.Text ~= "" then
-		saveUserId(userIdBox.Text)
+generateCodeBtn.MouseButton1Click:Connect(function()
+	if generateCodeBtn.Text:find("⏳") then
+		return
 	end
+	generateCode()
 end)
 
-urlBox.FocusLost:Connect(function()
-	if urlBox.Text ~= "" then
-		saveBackendUrl(urlBox.Text)
-	else
-		saveBackendUrl(DEFAULT_URL)
-	end
-end)
-
-print("🦈 DataShark IA Plugin v1.1.0 loaded successfully!")
-print("Click the toolbar button to open the import window")
-print("Backend URL: " .. getBackendUrl())
+print("🦈 DataShark IA Plugin v2.0 loaded!")
+print("Backend: " .. getBackendUrl())
+print("Sistema de clarificación con IA integrado")
 
