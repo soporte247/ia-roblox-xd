@@ -6,13 +6,12 @@ import express from 'express';
 import ClarificationManager from '../services/clarificationManager.js';
 import Generator from '../services/generator.js';
 import ErrorLogger from '../services/errorLogger.js';
-import Classifier from '../services/classifier.js';
+import { classifyPrompt } from '../services/classifier.js';
 
 const router = express.Router();
 const clarificationManager = new ClarificationManager();
 const generator = new Generator();
 const errorLogger = new ErrorLogger();
-const classifier = new Classifier();
 
 /**
  * POST /api/clarify
@@ -58,7 +57,7 @@ router.post('/', async (req, res) => {
     // Si no se detectó tipo, clasificar
     let detectedType = systemType;
     if (!detectedType) {
-      detectedType = await classifier.classify(enhancedPrompt);
+      detectedType = classifyPrompt(enhancedPrompt);
     }
 
     // Registrar solicitud de clarificación
@@ -141,7 +140,7 @@ router.post('/generate-questions', async (req, res) => {
     // Detectar tipo si no se proporciona
     let detectedType = systemType;
     if (!detectedType) {
-      detectedType = await classifier.classify(prompt);
+      detectedType = classifyPrompt(prompt);
     }
 
     // Generar preguntas
