@@ -3,7 +3,7 @@
  * Ayuda a la IA a crear código más pulido pidiendo detalles específicos
  */
 
-const Anthropic = require('@anthropic-ai/sdk');
+import Anthropic from '@anthropic-ai/sdk';
 
 class ClarificationManager {
   constructor() {
@@ -105,4 +105,4 @@ Formato: Devuelve JSON: { "questions": ["pregunta 1", "pregunta 2", ...] }`
   }
 }
 
-module.exports = ClarificationManager;
+export default ClarificationManager;

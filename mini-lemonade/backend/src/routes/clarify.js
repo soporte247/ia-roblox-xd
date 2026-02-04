@@ -2,13 +2,13 @@
  * Ruta /clarify - Procesa respuestas a preguntas de clarificación y genera código
  */
 
-const express = require('express');
-const router = express.Router();
-const ClarificationManager = require('../services/clarificationManager');
-const Generator = require('../services/generator');
-const ErrorLogger = require('../services/errorLogger');
-const Classifier = require('../services/classifier');
+import express from 'express';
+import ClarificationManager from '../services/clarificationManager.js';
+import Generator from '../services/generator.js';
+import ErrorLogger from '../services/errorLogger.js';
+import Classifier from '../services/classifier.js';
 
+const router = express.Router();
 const clarificationManager = new ClarificationManager();
 const generator = new Generator();
 const errorLogger = new ErrorLogger();
@@ -165,4 +165,4 @@ router.post('/generate-questions', async (req, res) => {
   }
 });
 
-module.exports = router;
+export default router;
