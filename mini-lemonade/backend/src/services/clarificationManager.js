@@ -1,12 +1,55 @@
 /**
  * ClarificationManager - Genera preguntas inteligentes para refinar solicitudes
- * Usa Ollama localmente (gratis) para generar preguntas contextuales
+ * Usa DeepSeek API (gratis) con fallback a Ollama local
  */
 
 class ClarificationManager {
   constructor() {
+    this.deepseekApiKey = process.env.DEEPSEEK_API_KEY || '';
+    this.deepseekBaseURL = process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com';
+    this.deepseekModel = process.env.DEEPSEEK_MODEL || 'deepseek-chat';
+
     this.ollamaBaseURL = process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
     this.ollamaModel = process.env.OLLAMA_MODEL || 'qwen2.5-coder:7b';
+  }
+
+  /**
+   * Llama a DeepSeek para generar preguntas de clarificación
+   */
+  async callDeepSeek(prompt) {
+    try {
+      const response = await fetch(`${this.deepseekBaseURL}/v1/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${this.deepseekApiKey}`
+        },
+        body: JSON.stringify({
+          model: this.deepseekModel,
+          messages: [
+            {
+              role: 'system',
+              content: 'Responde SOLO con JSON válido. No agregues texto adicional.'
+            },
+            {
+              role: 'user',
+              content: prompt
+            }
+          ],
+          temperature: 0.7
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`DeepSeek error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      return data?.choices?.[0]?.message?.content || '';
+    } catch (error) {
+      console.error('Error calling DeepSeek:', error.message);
+      return null;
+    }
   }
 
   /**
@@ -71,8 +114,14 @@ Genera 3-4 preguntas sobre: tipo de misión, recompensas, objetivos, dificultad.
 Formato: Devuelve SOLO JSON: { "questions": ["pregunta 1", "pregunta 2", ...] }`
       };
 
-      const ollamaPrompt = systemPrompts[systemType] || systemPrompts.attack;
-      const response = await this.callOllama(ollamaPrompt);
+      const finalPrompt = systemPrompts[systemType] || systemPrompts.attack;
+      let response = null;
+
+      if (this.deepseekApiKey) {
+        response = await this.callDeepSeek(finalPrompt);
+      } else if (this.ollamaBaseURL) {
+        response = await this.callOllama(finalPrompt);
+      }
 
       if (response) {
         try {
