@@ -58,6 +58,16 @@ router.post('/', async (req, res) => {
       detectedType = classifyPrompt(enhancedPrompt);
     }
 
+    // Validar userId/sessionId
+    let userId = sessionId;
+    if (!userId || userId === 'default' || userId.trim() === '') {
+      return res.status(400).json({
+        success: false,
+        error: 'Usuario inválido. Por favor recarga la página.',
+        code: null
+      });
+    }
+
     // Registrar solicitud de clarificación
     ErrorLogger.logInfo('Clarification request', {
       prompt: originalPrompt,
@@ -66,7 +76,7 @@ router.post('/', async (req, res) => {
     });
 
     // Generar código con contexto completo
-    const result = await generateSystem(detectedType, enhancedPrompt, sessionId);
+    const result = await generateSystem(detectedType, enhancedPrompt, userId);
 
     if (result.success) {
       return res.json({

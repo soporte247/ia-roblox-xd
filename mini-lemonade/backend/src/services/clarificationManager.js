@@ -7,7 +7,14 @@ import Anthropic from '@anthropic-ai/sdk';
 
 class ClarificationManager {
   constructor() {
-    this.client = new Anthropic();
+    // Initialize Anthropic client if API key is available
+    if (process.env.ANTHROPIC_API_KEY) {
+      this.client = new Anthropic({
+        apiKey: process.env.ANTHROPIC_API_KEY
+      });
+    } else {
+      this.client = null;
+    }
   }
 
   /**
@@ -16,6 +23,11 @@ class ClarificationManager {
    */
   async generateClarificationQuestions(prompt, systemType) {
     try {
+      // If no client is available, return default questions
+      if (!this.client) {
+        return this.getDefaultQuestions(systemType);
+      }
+
       const systemPrompts = {
         attack: `Eres un experto en sistemas de ataque para Roblox. 
 El usuario quiere: "${prompt}"
@@ -62,23 +74,52 @@ Formato: Devuelve JSON: { "questions": ["pregunta 1", "pregunta 2", ...] }`
         return JSON.parse(jsonMatch[0]);
       }
 
-      return {
-        questions: [
-          '¿Qué características específicas quieres?',
-          '¿Hay algún parámetro importante?',
-          '¿Necesitas algo adicional?'
-        ]
-      };
+      return this.getDefaultQuestions(systemType);
     } catch (error) {
       console.error('Error generando preguntas:', error);
-      return {
-        questions: [
-          '¿Qué características específicas quieres?',
-          '¿Hay algún parámetro importante?',
-          '¿Necesitas algo adicional?'
-        ]
-      };
+      return this.getDefaultQuestions(systemType);
     }
+  }
+
+  /**
+   * Retorna preguntas por defecto basadas en el tipo de sistema
+   */
+  getDefaultQuestions(systemType) {
+    const defaultQuestions = {
+      attack: [
+        '¿Cuál es el daño base del ataque?',
+        '¿Qué tipo de ataque es (melee, ranged, magic)?',
+        '¿Necesita animaciones especiales?'
+      ],
+      shop: [
+        '¿Qué tipos de items venderás?',
+        '¿Cuál es la moneda del juego?',
+        '¿Necesitas categorías de items?'
+      ],
+      ui: [
+        '¿Qué layout prefieres (grid, lista, custom)?',
+        '¿Qué colores principales?',
+        '¿Elementos interactivos especiales?'
+      ],
+      inventory: [
+        '¿Cuántos slots de inventario?',
+        '¿Qué tipos de items almacena?',
+        '¿Sistema de drop y organización?'
+      ],
+      quest: [
+        '¿Qué tipo de misiones?',
+        '¿Cuál es la recompensa principal?',
+        '¿Sistema de progreso?'
+      ]
+    };
+
+    return {
+      questions: defaultQuestions[systemType] || [
+        '¿Qué características específicas quieres?',
+        '¿Hay algún parámetro importante?',
+        '¿Necesitas algo adicional?'
+      ]
+    };
   }
 
   /**
