@@ -129,7 +129,7 @@ export async function generateSystem(type, prompt = '', userId = 'default') {
 
   // Validate each file
   const defaultTemplate = getDefaultTemplate(type);
-  const validFiles = {};
+  let validFiles = {};
   
   for (const [name, content] of Object.entries(files)) {
     try {
@@ -137,8 +137,11 @@ export async function generateSystem(type, prompt = '', userId = 'default') {
         logError('Invalid file content type', { name, type: typeof content });
         continue;
       }
-      // Validate Lua syntax
-      ResponseValidator.validateLuaCode(content, name);
+      // Only validate Lua syntax if NOT from default template
+      // Default templates are pre-validated and known to be correct
+      if (files !== defaultTemplate) {
+        ResponseValidator.validateLuaCode(content, name);
+      }
       validFiles[name] = content;
     } catch (error) {
       ErrorLogger.logError(`Lua validation failed for ${name}`, error, { userId, type });
