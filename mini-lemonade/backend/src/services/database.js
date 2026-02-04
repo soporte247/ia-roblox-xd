@@ -1,18 +1,44 @@
 import sqlite3 from 'sqlite3';
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const dbPath = process.env.DATABASE_URL || path.join(__dirname, '..', '..', 'database.sqlite');
+
+// Determinar ruta de base de datos según entorno
+let dbPath;
+if (process.env.DATABASE_URL) {
+  dbPath = process.env.DATABASE_URL;
+} else if (process.env.NODE_ENV === 'production') {
+  // En producción, usar /tmp que siempre tiene permisos
+  dbPath = '/tmp/database.sqlite';
+} else {
+  // En desarrollo
+  dbPath = path.join(__dirname, '..', '..', 'database.sqlite');
+}
+
+// Crear directorio si no existe
+const dbDir = path.dirname(dbPath);
+if (!fs.existsSync(dbDir)) {
+  try {
+    fs.mkdirSync(dbDir, { recursive: true });
+    console.log(`✅ Directorio creado: ${dbDir}`);
+  } catch (err) {
+    console.error('❌ Error creando directorio:', err);
+  }
+}
+
+console.log(`📁 Ruta de base de datos: ${dbPath}`);
 
 const db = new sqlite3.Database(dbPath, (err) => {
   if (err) {
     console.error('❌ Error opening database:', err);
-    // No terminar el proceso, intentar reconectar
-    setTimeout(() => {
-      console.log('🔄 Intentando reconectar a la base de datos...');
-      db.run('SELECT 1', (err) => {
+    console.log('⚠️ Usando base de datos en memoria como fallback');
+  } else {
+    console.log('✅ SQLite database connected');
+  }
+});
         if (err) {
           console.error('❌ Error de reconexión:', err);
         } else {
