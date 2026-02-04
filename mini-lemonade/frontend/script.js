@@ -372,7 +372,6 @@ function handleClear() {
   exportBtn.classList.add('hidden');
   currentFiles = {};
   window.optimizer.showNotification('🗑️ Formulario limpiado', 'info');
-}
   currentFiles = {};
   copyBtn.classList.add('hidden');
   exportBtn.classList.add('hidden');
