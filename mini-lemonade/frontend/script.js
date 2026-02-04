@@ -94,6 +94,21 @@ exportBtn.addEventListener('click', handleExport);
 historyBtn.addEventListener('click', showHistory);
 templatesBtn.addEventListener('click', showTemplates);
 saveCodeBtn.addEventListener('click', saveEditedCode);
+
+// Autoguardado con debounce
+promptInput.addEventListener('input', () => {
+  window.optimizer.debounce('savePrompt', () => {
+    localStorage.setItem('lastPrompt', promptInput.value);
+  }, 1000);
+});
+
+// Restaurar último prompt
+const lastPrompt = localStorage.getItem('lastPrompt');
+if (lastPrompt && !promptInput.value) {
+  promptInput.value = lastPrompt;
+}
+
+// Ctrl+Enter para generar
 promptInput.addEventListener('keydown', (e) => {
   if (e.ctrlKey && e.key === 'Enter') {
     handleGenerate();
@@ -136,16 +151,46 @@ async function handleGenerate() {
   const systemType = systemTypeSelect.value;
 
   if (!prompt) {
-    showResult('⚠️ Por favor, escribe una descripción del sistema', 'error');
+    window.optimizer.showNotification('⚠️ Por favor, escribe una descripción del sistema', 'warning');
+    return;
+  }
+
+  // Validar prompt
+  if (prompt.length < 3) {
+    window.optimizer.showNotification('⚠️ Descripción muy corta (mínimo 3 caracteres)', 'warning');
+    return;
+  }
+
+  if (prompt.length > 2000) {
+    window.optimizer.showNotification('⚠️ Descripción muy larga (máximo 2000 caracteres)', 'warning');
     return;
   }
 
   showLoading(true);
   resultDiv.innerHTML = '';
   generateBtn.disabled = true;
-  generateBtn.textContent = '⏳ Generando...';
+  generateBtn.classList.add('btn-loading');
+
+  const startTime = performance.now();
 
   try {
+    // Verificar si existe en caché
+    const cacheKey = `generate-${systemType}-${prompt}`;
+    const cached = window.optimizer.cacheGet(cacheKey);
+    
+    if (cached) {
+      console.log('✅ Usando respuesta cacheada');
+      await new Promise(resolve => setTimeout(resolve, 300)); // Simular carga
+      displaySuccess(cached);
+      window.optimizer.showNotification('⚡ Cargado desde caché', 'success');
+      copyBtn.classList.remove('hidden');
+      exportBtn.classList.remove('hidden');
+      showLoading(false);
+      generateBtn.disabled = false;
+      generateBtn.classList.remove('btn-loading');
+      return;
+    }
+
     const response = await fetch(`${API_URL}/generate`, {
       method: 'POST',
       headers: {
@@ -163,14 +208,21 @@ async function handleGenerate() {
     }
 
     const data = await response.json();
+    const duration = Math.round(performance.now() - startTime);
+    console.log(`⏱️ Generación completada en ${duration}ms`);
 
     if (data.success) {
+      // Guardar en caché
+      window.optimizer.cacheSet(cacheKey, data, 300000); // 5 minutos
+      
       await fetchGeneratedFiles();
       displaySuccess(data);
       copyBtn.classList.remove('hidden');
       exportBtn.classList.remove('hidden');
+      window.optimizer.showNotification('✅ Sistema generado exitosamente', 'success');
     } else {
       showResult(`❌ ${data.result.message}`, 'error');
+      window.optimizer.showNotification('❌ Error al generar sistema', 'error');
     }
   } catch (error) {
     console.error('Error:', error);
@@ -178,10 +230,11 @@ async function handleGenerate() {
       `❌ Error de conexión: ${error.message}<br><br>Verifica que el backend esté ejecutándose en ${API_URL}`,
       'error'
     );
+    window.optimizer.showNotification('❌ Error de conexión con el servidor', 'error');
   } finally {
     showLoading(false);
     generateBtn.disabled = false;
-    generateBtn.textContent = '✨ Generar Sistema';
+    generateBtn.classList.remove('btn-loading');
   }
 }
 
@@ -291,18 +344,23 @@ function escapeHtml(text) {
   return div.innerHTML;
 }
 
-function handleCopy() {
+async function handleCopy() {
   const allCode = Object.entries(currentFiles)
     .map(([name, content]) => `-- ${name}\n${content}`)
     .join('\n\n---\n\n');
   
-  navigator.clipboard.writeText(allCode).then(() => {
+  const success = await window.optimizer.copyToClipboard(allCode);
+  
+  if (success) {
+    window.optimizer.showNotification('✅ Código copiado al portapapeles', 'success');
     const originalText = copyBtn.textContent;
     copyBtn.textContent = '✅ Copiado!';
     setTimeout(() => {
       copyBtn.textContent = originalText;
     }, 2000);
-  });
+  } else {
+    window.optimizer.showNotification('❌ Error al copiar código', 'error');
+  }
 }
 
 function handleClear() {
@@ -310,6 +368,11 @@ function handleClear() {
   resultDiv.innerHTML = '';
   resultDiv.className = 'result';
   codeViewer.innerHTML = '<p class="empty-state">Genera un sistema para ver el código aquí</p>';
+  copyBtn.classList.add('hidden');
+  exportBtn.classList.add('hidden');
+  currentFiles = {};
+  window.optimizer.showNotification('🗑️ Formulario limpiado', 'info');
+}
   currentFiles = {};
   copyBtn.classList.add('hidden');
   exportBtn.classList.add('hidden');

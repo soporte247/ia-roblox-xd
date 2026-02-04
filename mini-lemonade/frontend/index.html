@@ -3,8 +3,20 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>DataShark IA - Roblox System Generator</title>
+  <meta name="description" content="DataShark IA - Genera sistemas Lua profesionales para Roblox con Inteligencia Artificial">
+  <meta name="keywords" content="Roblox, Lua, IA, generador, código, sistemas">
+  <title>DataShark IA - Generador de Sistemas Roblox con IA</title>
+  
+  <!-- Preconnect a APIs externas -->
+  <link rel="preconnect" href="https://api.deepseek.com">
+  <link rel="dns-prefetch" href="https://api.deepseek.com">
+  
+  <!-- Estilos -->
   <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="components.css">
+  
+  <!-- Favicon -->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🦈</text></svg>">
 </head>
 <body>
   <!-- LANDING PAGE -->
@@ -257,6 +269,21 @@
     </div>
   </div>
 
+  <!-- Toast Container -->
+  <div id="toastContainer" class="toast-container"></div>
+
+  <!-- Scripts -->
+  <script src="optimizer.js"></script>
   <script src="script.js"></script>
+  
+  <!-- Performance monitoring -->
+  <script>
+    // Medir tiempo de carga
+    window.addEventListener('load', () => {
+      const perfData = performance.getEntriesByType('navigation')[0];
+      console.log('⚡ Tiempo de carga:', Math.round(perfData.loadEventEnd - perfData.fetchStart), 'ms');
+    });
+  </script>
 </body>
 </html>
+
