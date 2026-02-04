@@ -481,6 +481,154 @@
         opacity: 1;
       }
     }
+
+    /* Clarification Modal */
+    .clarification-modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.8);
+      z-index: 2000;
+      animation: fadeIn 0.3s ease-out;
+    }
+
+    .clarification-modal.active {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    .clarification-content {
+      background: linear-gradient(135deg, #0a1929 0%, #1a237e 100%);
+      border: 1px solid rgba(66, 165, 245, 0.3);
+      border-radius: 12px;
+      padding: 30px;
+      max-width: 500px;
+      width: 90%;
+      max-height: 80vh;
+      overflow-y: auto;
+      box-shadow: 0 8px 32px rgba(66, 165, 245, 0.3);
+    }
+
+    .clarification-header {
+      font-size: 1.4em;
+      font-weight: bold;
+      color: #42a5f5;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .clarification-description {
+      color: rgba(255, 255, 255, 0.7);
+      margin-bottom: 20px;
+      font-size: 0.95em;
+    }
+
+    .questions-container {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+      margin-bottom: 25px;
+    }
+
+    .question-item {
+      background: rgba(66, 165, 245, 0.1);
+      border: 1px solid rgba(66, 165, 245, 0.3);
+      border-radius: 8px;
+      padding: 12px;
+    }
+
+    .question-label {
+      font-weight: 600;
+      color: #90caf9;
+      margin-bottom: 6px;
+      font-size: 0.9em;
+    }
+
+    .question-input {
+      width: 100%;
+      padding: 10px;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(66, 165, 245, 0.3);
+      border-radius: 6px;
+      color: white;
+      font-size: 0.9em;
+      resize: vertical;
+      min-height: 50px;
+    }
+
+    .question-input::placeholder {
+      color: rgba(255, 255, 255, 0.4);
+    }
+
+    .question-input:focus {
+      outline: none;
+      border-color: rgba(66, 165, 245, 0.7);
+      background: rgba(255, 255, 255, 0.15);
+    }
+
+    .clarification-buttons {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+    }
+
+    .clarification-btn {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 6px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      font-size: 0.9em;
+    }
+
+    .clarification-btn.cancel {
+      background: rgba(255, 255, 255, 0.1);
+      color: white;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+    }
+
+    .clarification-btn.cancel:hover {
+      background: rgba(255, 255, 255, 0.2);
+      border-color: rgba(255, 255, 255, 0.5);
+    }
+
+    .clarification-btn.generate {
+      background: #42a5f5;
+      color: white;
+    }
+
+    .clarification-btn.generate:hover {
+      background: #2196f3;
+      box-shadow: 0 4px 12px rgba(33, 150, 243, 0.4);
+    }
+
+    .clarification-btn.generate:disabled {
+      background: #999;
+      cursor: not-allowed;
+      opacity: 0.6;
+    }
+
+    .clarification-info {
+      background: rgba(76, 175, 80, 0.15);
+      border-left: 3px solid #4caf50;
+      border-radius: 4px;
+      padding: 10px;
+      margin-bottom: 15px;
+      font-size: 0.85em;
+      color: #a5d6a7;
+    }
   </style>
 </head>
 <body>
@@ -530,6 +678,26 @@
           ></textarea>
           <button class="send-btn" id="sendBtn" onclick="sendMessage()">Enviar</button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Clarification Modal -->
+  <div id="clarificationModal" class="clarification-modal">
+    <div class="clarification-content">
+      <div class="clarification-header">
+        ❓ Algunos detalles más
+      </div>
+      <div class="clarification-description" id="clarificationDescription">
+        Para crear un código más pulido, responde estas preguntas sobre lo que quieres:
+      </div>
+      <div class="clarification-info">
+        <strong>💡 Tip:</strong> Responde al menos 2 preguntas para generar el código.
+      </div>
+      <div id="questionsContainer" class="questions-container"></div>
+      <div class="clarification-buttons">
+        <button class="clarification-btn cancel" onclick="closeClarificationModal()">Cancelar</button>
+        <button class="clarification-btn generate" id="generateFromClarificationBtn" onclick="submitClarification()">Generar Código</button>
       </div>
     </div>
   </div>
@@ -610,14 +778,140 @@
       // Show loading indicator
       const loadingId = showLoading();
       
-      // Send message with retry
-      await sendMessageWithRetry(
-        message, 
-        systemType, 
-        getUserId(), 
-        loadingId, 
-        3 // max retries
-      );
+      // First, try to get clarification questions
+      await getAndShowClarificationQuestions(message, systemType, loadingId);
+    }
+
+    // Get clarification questions and show modal
+    async function getAndShowClarificationQuestions(prompt, systemType, loadingId) {
+      try {
+        removeMessage(loadingId);
+        
+        const response = await fetch('/api/clarify/generate-questions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            prompt: prompt,
+            ...(systemType ? { systemType } : {})
+          })
+        });
+
+        const data = await response.json();
+
+        if (data.success && data.questions && data.questions.length > 0) {
+          // Show modal with questions
+          showClarificationModal(data.questions, prompt, data.systemType);
+        } else {
+          // No questions needed, generate directly
+          await sendMessageWithRetry(prompt, systemType, getUserId(), loadingId, 3);
+        }
+      } catch (error) {
+        console.error('Error getting clarification questions:', error);
+        // Fallback: generate directly without clarification
+        const newLoadingId = showLoading();
+        await sendMessageWithRetry(prompt, systemType, getUserId(), newLoadingId, 3);
+      }
+    }
+
+    // Show clarification modal
+    function showClarificationModal(questions, originalPrompt, systemType) {
+      const modal = document.getElementById('clarificationModal');
+      const container = document.getElementById('questionsContainer');
+      
+      // Store data for later submission
+      window.clarificationData = {
+        originalPrompt: originalPrompt,
+        systemType: systemType,
+        questions: questions,
+        answers: []
+      };
+
+      // Build question inputs
+      container.innerHTML = '';
+      questions.forEach((question, index) => {
+        const div = document.createElement('div');
+        div.className = 'question-item';
+        div.innerHTML = `
+          <div class="question-label">Pregunta ${index + 1}</div>
+          <textarea class="question-input" placeholder="Describe..." data-index="${index}"></textarea>
+          <small style="color: rgba(255, 255, 255, 0.4); font-size: 0.8em;">${escapeHtml(question)}</small>
+        `;
+        container.appendChild(div);
+      });
+
+      // Show modal
+      modal.classList.add('active');
+    }
+
+    // Close clarification modal
+    function closeClarificationModal() {
+      document.getElementById('clarificationModal').classList.remove('active');
+      window.clarificationData = null;
+    }
+
+    // Submit clarification and generate code
+    async function submitClarification() {
+      const inputs = document.querySelectorAll('.question-input');
+      const answers = Array.from(inputs).map(input => input.value.trim());
+      
+      // Validate answers
+      const filledAnswers = answers.filter(a => a.length > 0).length;
+      if (filledAnswers < 2) {
+        showToast('Por favor responde al menos 2 preguntas', 'error');
+        return;
+      }
+
+      const data = window.clarificationData;
+      const loadingId = showLoading();
+      closeClarificationModal();
+
+      try {
+        // Disable button during submission
+        const btn = document.getElementById('generateFromClarificationBtn');
+        btn.disabled = true;
+        btn.textContent = 'Generando...';
+
+        const response = await fetch('/api/clarify', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            originalPrompt: data.originalPrompt,
+            systemType: data.systemType,
+            questions: data.questions,
+            answers: answers,
+            sessionId: getUserId()
+          })
+        });
+
+        const result = await response.json();
+        removeMessage(loadingId);
+
+        if (result.success) {
+          showGenerationSuccess(result);
+        } else {
+          showGenerationError({
+            message: result.error || 'Error desconocido',
+            suggestion: result.suggestion,
+            canRetry: result.canRetry !== false
+          }, false);
+        }
+      } catch (error) {
+        console.error('Error submitting clarification:', error);
+        removeMessage(loadingId);
+        showGenerationError({
+          message: 'Error enviando respuestas: ' + error.message,
+          suggestion: 'Intenta de nuevo',
+          canRetry: true
+        }, true);
+      } finally {
+        const btn = document.getElementById('generateFromClarificationBtn');
+        btn.disabled = false;
+        btn.textContent = 'Generar Código';
+      }
     }
 
     async function sendMessageWithRetry(prompt, systemType, userId, loadingId, maxRetries = 3) {

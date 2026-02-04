@@ -1,0 +1,168 @@
+/**
+ * Ruta /clarify - Procesa respuestas a preguntas de clarificación y genera código
+ */
+
+const express = require('express');
+const router = express.Router();
+const ClarificationManager = require('../services/clarificationManager');
+const Generator = require('../services/generator');
+const ErrorLogger = require('../services/errorLogger');
+const Classifier = require('../services/classifier');
+
+const clarificationManager = new ClarificationManager();
+const generator = new Generator();
+const errorLogger = new ErrorLogger();
+const classifier = new Classifier();
+
+/**
+ * POST /api/clarify
+ * Procesa respuestas a preguntas y genera código
+ */
+router.post('/', async (req, res) => {
+  try {
+    const {
+      originalPrompt,
+      systemType,
+      questions,
+      answers,
+      sessionId
+    } = req.body;
+
+    // Validar entrada
+    if (!originalPrompt || !questions || !answers) {
+      return res.status(400).json({
+        success: false,
+        error: 'Faltan datos: originalPrompt, questions, answers',
+        code: null
+      });
+    }
+
+    // Validar que hay suficientes respuestas
+    if (!clarificationManager.areAnswersSufficient(answers)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Por favor responde al menos 2 preguntas',
+        code: null,
+        answered: answers.filter(a => a && a.trim().length > 0).length,
+        required: 2
+      });
+    }
+
+    // Construir prompt mejorado
+    const enhancedPrompt = clarificationManager.buildEnhancedPrompt(
+      originalPrompt,
+      questions,
+      answers
+    );
+
+    // Si no se detectó tipo, clasificar
+    let detectedType = systemType;
+    if (!detectedType) {
+      detectedType = await classifier.classify(enhancedPrompt);
+    }
+
+    // Registrar solicitud de clarificación
+    errorLogger.logRequest({
+      prompt: originalPrompt,
+      clarifiedPrompt: enhancedPrompt,
+      systemType: detectedType,
+      hasContext: true,
+      sessionId
+    });
+
+    // Generar código con contexto completo
+    const result = await generator.generateCode(
+      enhancedPrompt,
+      detectedType,
+      { retries: 3 }
+    );
+
+    if (result.success) {
+      return res.json({
+        success: true,
+        code: result.code,
+        systemType: detectedType,
+        clarificationUsed: true,
+        questions: questions,
+        answers: answers
+      });
+    } else {
+      // Si hay error, loguear y retornar
+      errorLogger.logError({
+        type: 'generation_error',
+        message: result.error,
+        prompt: enhancedPrompt,
+        suggestion: result.suggestion,
+        retriable: result.canRetry,
+        systemType: detectedType
+      });
+
+      return res.status(500).json({
+        success: false,
+        error: result.error,
+        suggestion: result.suggestion,
+        canRetry: result.canRetry,
+        code: null
+      });
+    }
+  } catch (error) {
+    console.error('Error en /clarify:', error);
+
+    errorLogger.logError({
+      type: 'clarification_error',
+      message: error.message,
+      stack: error.stack
+    });
+
+    res.status(500).json({
+      success: false,
+      error: 'Error procesando clarificación: ' + error.message,
+      suggestion: 'Intenta de nuevo con respuestas más específicas',
+      code: null
+    });
+  }
+});
+
+/**
+ * POST /api/clarify/generate-questions
+ * Solo genera preguntas sin generar código aún
+ */
+router.post('/generate-questions', async (req, res) => {
+  try {
+    const { prompt, systemType } = req.body;
+
+    if (!prompt) {
+      return res.status(400).json({
+        success: false,
+        error: 'Se requiere prompt'
+      });
+    }
+
+    // Detectar tipo si no se proporciona
+    let detectedType = systemType;
+    if (!detectedType) {
+      detectedType = await classifier.classify(prompt);
+    }
+
+    // Generar preguntas
+    const result = await clarificationManager.generateClarificationQuestions(
+      prompt,
+      detectedType
+    );
+
+    res.json({
+      success: true,
+      questions: result.questions,
+      systemType: detectedType,
+      originalPrompt: prompt
+    });
+  } catch (error) {
+    console.error('Error generando preguntas:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Error generando preguntas: ' + error.message
+    });
+  }
+});
+
+module.exports = router;
