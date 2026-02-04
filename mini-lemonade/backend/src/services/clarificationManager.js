@@ -1,19 +1,39 @@
 /**
  * ClarificationManager - Genera preguntas inteligentes para refinar solicitudes
- * Ayuda a la IA a crear código más pulido pidiendo detalles específicos
+ * Usa Ollama localmente (gratis) para generar preguntas contextuales
  */
-
-import Anthropic from '@anthropic-ai/sdk';
 
 class ClarificationManager {
   constructor() {
-    // Initialize Anthropic client if API key is available
-    if (process.env.ANTHROPIC_API_KEY) {
-      this.client = new Anthropic({
-        apiKey: process.env.ANTHROPIC_API_KEY
+    this.ollamaBaseURL = process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
+    this.ollamaModel = process.env.OLLAMA_MODEL || 'qwen2.5-coder:7b';
+  }
+
+  /**
+   * Llama a Ollama para generar preguntas de clarificación
+   */
+  async callOllama(prompt) {
+    try {
+      const response = await fetch(`${this.ollamaBaseURL}/api/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: this.ollamaModel,
+          prompt: prompt,
+          stream: false,
+          temperature: 0.7
+        })
       });
-    } else {
-      this.client = null;
+
+      if (!response.ok) {
+        throw new Error(`Ollama error: ${response.status}`);
+      }
+
+      const data = await response.json();
+      return data.response || '';
+    } catch (error) {
+      console.error('Error calling Ollama:', error.message);
+      return null;
     }
   }
 
@@ -23,57 +43,52 @@ class ClarificationManager {
    */
   async generateClarificationQuestions(prompt, systemType) {
     try {
-      // If no client is available, return default questions
-      if (!this.client) {
-        return this.getDefaultQuestions(systemType);
-      }
-
       const systemPrompts = {
         attack: `Eres un experto en sistemas de ataque para Roblox. 
 El usuario quiere: "${prompt}"
 Genera 3-4 preguntas cortas y específicas para entender mejor qué tipo de ataque necesita.
 Las preguntas deben ser claras y respuestas cortas.
-Formato: Devuelve JSON: { "questions": ["pregunta 1", "pregunta 2", ...] }`,
+Formato: Devuelve SOLO JSON: { "questions": ["pregunta 1", "pregunta 2", ...] }`,
 
         shop: `Eres un experto en sistemas de tienda para Roblox. 
 El usuario quiere: "${prompt}"
 Genera 3-4 preguntas cortas para entender la tienda: tipos de items, moneda, categorías.
-Formato: Devuelve JSON: { "questions": ["pregunta 1", "pregunta 2", ...] }`,
+Formato: Devuelve SOLO JSON: { "questions": ["pregunta 1", "pregunta 2", ...] }`,
 
         ui: `Eres un experto en interfaces para Roblox. 
 El usuario quiere: "${prompt}"
 Genera 3-4 preguntas sobre: layout, colores, funcionalidad, elementos específicos.
-Formato: Devuelve JSON: { "questions": ["pregunta 1", "pregunta 2", ...] }`,
+Formato: Devuelve SOLO JSON: { "questions": ["pregunta 1", "pregunta 2", ...] }`,
 
         inventory: `Eres un experto en sistemas de inventario para Roblox. 
 El usuario quiere: "${prompt}"
 Genera 3-4 preguntas sobre: capacidad, tipos de items, organización, límites.
-Formato: Devuelve JSON: { "questions": ["pregunta 1", "pregunta 2", ...] }`,
+Formato: Devuelve SOLO JSON: { "questions": ["pregunta 1", "pregunta 2", ...] }`,
 
         quest: `Eres un experto en sistemas de misiones para Roblox. 
 El usuario quiere: "${prompt}"
 Genera 3-4 preguntas sobre: tipo de misión, recompensas, objetivos, dificultad.
-Formato: Devuelve JSON: { "questions": ["pregunta 1", "pregunta 2", ...] }`
+Formato: Devuelve SOLO JSON: { "questions": ["pregunta 1", "pregunta 2", ...] }`
       };
 
-      const message = await this.client.messages.create({
-        model: 'claude-3-5-sonnet-20241022',
-        max_tokens: 500,
-        messages: [
-          {
-            role: 'user',
-            content: systemPrompts[systemType] || systemPrompts.attack
-          }
-        ]
-      });
+      const ollamaPrompt = systemPrompts[systemType] || systemPrompts.attack;
+      const response = await this.callOllama(ollamaPrompt);
 
-      const content = message.content[0].text;
-      const jsonMatch = content.match(/\{[\s\S]*\}/);
-      
-      if (jsonMatch) {
-        return JSON.parse(jsonMatch[0]);
+      if (response) {
+        try {
+          const jsonMatch = response.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            const parsed = JSON.parse(jsonMatch[0]);
+            if (parsed.questions && Array.isArray(parsed.questions)) {
+              return parsed;
+            }
+          }
+        } catch (parseError) {
+          console.error('Error parsing Ollama response:', parseError);
+        }
       }
 
+      // Fallback a preguntas predefinidas
       return this.getDefaultQuestions(systemType);
     } catch (error) {
       console.error('Error generando preguntas:', error);
