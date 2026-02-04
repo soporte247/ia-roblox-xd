@@ -637,13 +637,13 @@
           };
         } else {
           statusElement.classList.add('unavailable');
-          textElement.textContent = '❌ Plugin no disponible';
-          statusElement.title = 'El plugin DataShark no ha sido detectado';
+          textElement.textContent = '🚧 Plugin en construcción, pronto lanzaremos la BETA';
+          statusElement.title = 'Plugin en construcción. Pronto lanzaremos la BETA.';
         }
       } catch (error) {
         console.error('Error verificando plugin:', error);
         document.getElementById('pluginStatus').classList.add('unavailable');
-        document.getElementById('pluginText').textContent = '⚠️ Error';
+        document.getElementById('pluginText').textContent = '🚧 Plugin en construcción, pronto lanzaremos la BETA';
       }
     }
 
