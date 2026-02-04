@@ -438,6 +438,26 @@
   <script>
     // Auto-resize textarea
     const messageInput = document.getElementById('messageInput');
+    let userId = null;
+
+    function getUserId() {
+      if (!userId) {
+        userId = localStorage.getItem('dataSharkUserId');
+        if (!userId) {
+          userId = generateUUID();
+          localStorage.setItem('dataSharkUserId', userId);
+        }
+      }
+      return userId;
+    }
+
+    function generateUUID() {
+      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        const r = Math.random() * 16 | 0;
+        const v = c === 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+      });
+    }
     messageInput.addEventListener('input', function() {
       this.style.height = 'auto';
       this.style.height = Math.min(this.scrollHeight, 120) + 'px';
@@ -463,7 +483,8 @@
     // Send message
     async function sendMessage() {
       const message = messageInput.value.trim();
-      const systemType = document.getElementById('systemType').value;
+      const rawSystemType = document.getElementById('systemType').value;
+      const systemType = rawSystemType ? rawSystemType.toLowerCase() : null;
 
       if (!message) {
         showToast('Por favor escribe algo', 'error');
@@ -486,7 +507,8 @@
           },
           body: JSON.stringify({
             prompt: message,
-            systemType: systemType || 'auto'
+            userId: getUserId(),
+            ...(systemType ? { systemType } : {})
           })
         });
 
