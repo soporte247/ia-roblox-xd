@@ -3,6 +3,9 @@
  * Usa DeepSeek API (gratis) con fallback a Ollama local
  */
 
+import cacheService from './cacheService.js';
+import metricsService from './metricsService.js';
+
 class ClarificationManager {
   constructor() {
     this.deepseekApiKey = process.env.DEEPSEEK_API_KEY || '';
@@ -11,43 +14,100 @@ class ClarificationManager {
 
     this.ollamaBaseURL = process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
     this.ollamaModel = process.env.OLLAMA_MODEL || 'qwen2.5-coder:7b';
+
+    // Configuración de timeout y retry
+    this.timeout = parseInt(process.env.AI_TIMEOUT || '30000'); // 30s por defecto
+    this.maxRetries = parseInt(process.env.AI_MAX_RETRIES || '2'); // 2 reintentos
+  }
+
+  /**
+   * Ejecuta una operación con timeout
+   */
+  async withTimeout(promise, timeoutMs) {
+    return Promise.race([
+      promise,
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Timeout excedido')), timeoutMs)
+      )
+    ]);
+  }
+
+  /**
+   * Ejecuta una operación con retry logic
+   */
+  async withRetry(operation, maxRetries) {
+    let lastError;
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        return await operation();
+      } catch (error) {
+        lastError = error;
+        if (attempt < maxRetries) {
+          const delay = Math.min(1000 * Math.pow(2, attempt), 5000); // Exponential backoff
+          console.log(`[Retry ${attempt + 1}/${maxRetries}] Waiting ${delay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+      }
+    }
+    throw lastError;
   }
 
   /**
    * Llama a DeepSeek para generar preguntas de clarificación
    */
   async callDeepSeek(prompt) {
+    const startTime = Date.now();
     try {
-      const response = await fetch(`${this.deepseekBaseURL}/v1/chat/completions`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${this.deepseekApiKey}`
-        },
-        body: JSON.stringify({
-          model: this.deepseekModel,
-          messages: [
-            {
-              role: 'system',
-              content: 'Responde SOLO con JSON válido. No agregues texto adicional.'
+      const operation = async () => {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), this.timeout);
+
+        try {
+          const response = await fetch(`${this.deepseekBaseURL}/v1/chat/completions`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${this.deepseekApiKey}`
             },
-            {
-              role: 'user',
-              content: prompt
-            }
-          ],
-          temperature: 0.7
-        })
-      });
+            body: JSON.stringify({
+              model: this.deepseekModel,
+              messages: [
+                {
+                  role: 'system',
+                  content: 'Responde SOLO con JSON válido. No agregues texto adicional.'
+                },
+                {
+                  role: 'user',
+                  content: prompt
+                }
+              ],
+              temperature: 0.7,
+              max_tokens: 500 // Limitar tokens para respuestas más rápidas
+            }),
+            signal: controller.signal
+          });
 
-      if (!response.ok) {
-        throw new Error(`DeepSeek error: ${response.status}`);
-      }
+          clearTimeout(timeoutId);
 
-      const data = await response.json();
-      return data?.choices?.[0]?.message?.content || '';
+          if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`DeepSeek error: ${response.status} - ${errorText}`);
+          }
+
+          const data = await response.json();
+          const result = data?.choices?.[0]?.message?.content || '';
+          
+          metricsService.trackAICall('deepseek', true, Date.now() - startTime);
+          return result;
+        } finally {
+          clearTimeout(timeoutId);
+        }
+      };
+
+      return await this.withRetry(operation, this.maxRetries);
     } catch (error) {
-      console.error('Error calling DeepSeek:', error.message);
+      console.error('❌ Error calling DeepSeek:', error.message);
+      metricsService.trackAICall('deepseek', false, Date.now() - startTime);
       return null;
     }
   }
@@ -56,26 +116,48 @@ class ClarificationManager {
    * Llama a Ollama para generar preguntas de clarificación
    */
   async callOllama(prompt) {
+    const startTime = Date.now();
     try {
-      const response = await fetch(`${this.ollamaBaseURL}/api/generate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: this.ollamaModel,
-          prompt: prompt,
-          stream: false,
-          temperature: 0.7
-        })
-      });
+      const operation = async () => {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), this.timeout);
 
-      if (!response.ok) {
-        throw new Error(`Ollama error: ${response.status}`);
-      }
+        try {
+          const response = await fetch(`${this.ollamaBaseURL}/api/generate`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              model: this.ollamaModel,
+              prompt: prompt,
+              stream: false,
+              temperature: 0.7,
+              options: {
+                num_predict: 300 // Limitar longitud de respuesta
+              }
+            }),
+            signal: controller.signal
+          });
 
-      const data = await response.json();
-      return data.response || '';
+          clearTimeout(timeoutId);
+
+          if (!response.ok) {
+            throw new Error(`Ollama error: ${response.status}`);
+          }
+
+          const data = await response.json();
+          const result = data.response || '';
+          
+          metricsService.trackAICall('ollama', true, Date.now() - startTime);
+          return result;
+        } finally {
+          clearTimeout(timeoutId);
+        }
+      };
+
+      return await this.withRetry(operation, this.maxRetries);
     } catch (error) {
-      console.error('Error calling Ollama:', error.message);
+      console.error('❌ Error calling Ollama:', error.message);
+      metricsService.trackAICall('ollama', false, Date.now() - startTime);
       return null;
     }
   }
@@ -85,7 +167,15 @@ class ClarificationManager {
    * Retorna preguntas relevantes según el tipo de sistema
    */
   async generateClarificationQuestions(prompt, systemType) {
+    const startTime = Date.now();
     try {
+      // Intentar obtener del caché primero
+      const cached = cacheService.get(`questions-${systemType}`, prompt);
+      if (cached) {
+        metricsService.trackClarification('questions', cached.questions?.length || 0, Date.now() - startTime);
+        return cached;
+      }
+
       const systemPrompts = {
         attack: `Eres un experto en sistemas de ataque para Roblox. 
 El usuario quiere: "${prompt}"
@@ -117,9 +207,15 @@ Formato: Devuelve SOLO JSON: { "questions": ["pregunta 1", "pregunta 2", ...] }`
       const finalPrompt = systemPrompts[systemType] || systemPrompts.attack;
       let response = null;
 
+      // Intentar DeepSeek primero
       if (this.deepseekApiKey) {
+        console.log('🤖 Generando preguntas con DeepSeek...');
         response = await this.callDeepSeek(finalPrompt);
-      } else if (this.ollamaBaseURL) {
+      }
+
+      // Fallback a Ollama si DeepSeek falla
+      if (!response && this.ollamaBaseURL) {
+        console.log('🔄 DeepSeek no disponible, usando Ollama...');
         response = await this.callOllama(finalPrompt);
       }
 
@@ -129,18 +225,30 @@ Formato: Devuelve SOLO JSON: { "questions": ["pregunta 1", "pregunta 2", ...] }`
           if (jsonMatch) {
             const parsed = JSON.parse(jsonMatch[0]);
             if (parsed.questions && Array.isArray(parsed.questions)) {
+              // Guardar en caché
+              cacheService.set(`questions-${systemType}`, prompt, parsed);
+              metricsService.trackClarification('questions', parsed.questions.length, Date.now() - startTime);
               return parsed;
             }
           }
         } catch (parseError) {
-          console.error('Error parsing Ollama response:', parseError);
+          console.error('❌ Error parsing AI response:', parseError);
         }
       }
 
       // Fallback a preguntas predefinidas
-      return this.getDefaultQuestions(systemType);
+      console.log('⚠️ Usando preguntas predefinidas como fallback');
+      const defaultQuestions = this.getDefaultQuestions(systemType);
+      
+      // Guardar fallback en caché por menos tiempo
+      cacheService.set(`questions-${systemType}`, prompt, defaultQuestions);
+      metricsService.trackClarification('questions', defaultQuestions.questions?.length || 0, Date.now() - startTime);
+      metricsService.trackAICall('templates', true, 0);
+      
+      return defaultQuestions;
     } catch (error) {
-      console.error('Error generando preguntas:', error);
+      console.error('❌ Error generando preguntas:', error);
+      metricsService.trackClarification('questions', 0, Date.now() - startTime);
       return this.getDefaultQuestions(systemType);
     }
   }

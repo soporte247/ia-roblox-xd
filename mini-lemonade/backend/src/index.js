@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import compression from 'compression';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import cookieParser from 'cookie-parser';
@@ -20,6 +21,8 @@ import clarifyRouter from './routes/clarify.js';
 import { initDB } from './services/database.js';
 import { requestLogger, requestTimeout, rateLimit } from './middleware/errorHandler.js';
 import { monitor } from './services/healthMonitor.js';
+import cacheService from './services/cacheService.js';
+import metricsService from './services/metricsService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -31,10 +34,30 @@ const PORT = process.env.PORT || 3000;
 await initDB();
 
 // Middleware
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(compression()); // Comprimir todas las respuestas
+app.use(express.json({ limit: '10mb' })); // Limitar tamaño de JSON
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cookieParser());
 app.use(requestLogger); // Logging de requests
+
+// Middleware de métricas
+app.use((req, res, next) => {
+  const startTime = Date.now();
+  metricsService.trackRequest(req.path, req.method);
+
+  // Capturar cuando la respuesta termina
+  res.on('finish', () => {
+    const responseTime = Date.now() - startTime;
+    metricsService.trackResponseTime(responseTime);
+    
+    if (res.statusCode >= 200 && res.statusCode < 400) {
+      metricsService.trackSuccess();
+    }
+  });
+
+  next();
+});
+
 app.use(requestTimeout(30000)); // Timeout de 30 segundos
 app.use(rateLimit(60000, 100)); // 100 requests por minuto
 app.use(cors({
@@ -79,6 +102,43 @@ app.get('/api/health/detailed', (req, res) => {
   res.json(monitor.getStatus());
 });
 
+// Estadísticas de caché
+app.get('/api/health/cache', (req, res) => {
+  res.json({
+    success: true,
+    cache: cacheService.getStats(),
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Limpiar caché (solo para admin/desarrollo)
+app.post('/api/health/cache/clear', (req, res) => {
+  const { type } = req.body;
+  
+  if (type) {
+    cacheService.invalidateType(type);
+    res.json({ success: true, message: `Caché del tipo ${type} limpiado` });
+  } else {
+    cacheService.clear();
+    res.json({ success: true, message: 'Caché completamente limpiado' });
+  }
+});
+
+// Métricas del sistema
+app.get('/api/health/metrics', (req, res) => {
+  res.json({
+    success: true,
+    metrics: metricsService.getMetrics(),
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Resetear métricas (solo para admin/desarrollo)
+app.post('/api/health/metrics/reset', (req, res) => {
+  metricsService.reset();
+  res.json({ success: true, message: 'Métricas reseteadas' });
+});
+
 // Ruta raíz
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, '../../frontend/index.html'));
@@ -92,6 +152,12 @@ app.use((err, req, res, next) => {
     path: req.path,
     method: req.method,
     timestamp: new Date().toISOString()
+  });
+  
+  // Registrar error en métricas
+  metricsService.trackError(err, req.path, {
+    method: req.method,
+    statusCode: err.statusCode || 500
   });
   
   const statusCode = err.statusCode || 500;

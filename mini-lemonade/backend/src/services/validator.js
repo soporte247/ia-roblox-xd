@@ -5,6 +5,70 @@
 
 export class ResponseValidator {
   /**
+   * Sanitiza y valida prompts de entrada del usuario
+   */
+  static sanitizePrompt(prompt) {
+    if (!prompt || typeof prompt !== 'string') {
+      throw new Error('El prompt debe ser texto válido');
+    }
+
+    // Limpiar espacios
+    let cleaned = prompt.trim();
+
+    // Validar longitud
+    if (cleaned.length < 3) {
+      throw new Error('El prompt es demasiado corto (mínimo 3 caracteres)');
+    }
+
+    if (cleaned.length > 2000) {
+      throw new Error('El prompt es demasiado largo (máximo 2000 caracteres)');
+    }
+
+    // Detectar y bloquear patrones peligrosos
+    const dangerousPatterns = [
+      /require\s*\(\s*["']os["']\s*\)/gi,
+      /require\s*\(\s*["']io["']\s*\)/gi,
+      /loadstring/gi,
+      /dofile/gi,
+      /getfenv/gi,
+      /setfenv/gi,
+      /<script>/gi,
+      /javascript:/gi,
+      /on(load|error|click)/gi,
+      /eval\(/gi,
+      /exec\(/gi,
+      /system\(/gi
+    ];
+
+    for (const pattern of dangerousPatterns) {
+      if (pattern.test(cleaned)) {
+        throw new Error('El prompt contiene código potencialmente peligroso');
+      }
+    }
+
+    // Remover caracteres especiales peligrosos pero mantener puntuación normal
+    cleaned = cleaned.replace(/[<>{}\\]/g, '');
+
+    // Limitar caracteres repetidos excesivos
+    cleaned = cleaned.replace(/(.)\1{10,}/g, '$1$1$1');
+
+    return cleaned;
+  }
+
+  /**
+   * Valida sessionId/userId
+   */
+  static validateSessionId(sessionId) {
+    if (!sessionId || typeof sessionId !== 'string') {
+      return false;
+    }
+
+    // Debe ser UUID v4 o similar
+    const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    
+    return uuidPattern.test(sessionId);
+  }
+  /**
    * Valida que el JSON de respuesta sea válido y contenga estructura esperada
    */
   static validateJsonResponse(content, type) {
