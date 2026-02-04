@@ -86,9 +86,8 @@ router.post('/', async (req, res) => {
 
       return res.status(500).json({
         success: false,
-        error: result.error,
+        error: result.message,
         suggestion: result.suggestion,
-        canRetry: result.canRetry,
         code: null
       });
     }
