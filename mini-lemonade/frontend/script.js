@@ -247,6 +247,9 @@ function displaySuccess(data) {
   let html = `<strong>✅ Éxito!</strong><br><br>`;
   html += `<strong>Tipo de sistema:</strong> ${type}<br>`;
   html += `<strong>Mensaje:</strong> ${result.message}<br><br>`;
+  
+  // Agregar botón para enviar al plugin
+  html += `<button id="sendToPluginBtn" class="btn btn-primary" style="margin: 10px 0;">🦈 Enviar al Plugin (Inyección Automática)</button><br><br>`;
 
   if (result.files && result.files.length > 0) {
     html += `<strong>Archivos generados:</strong><br>`;
@@ -261,6 +264,14 @@ function displaySuccess(data) {
   html += `<br><em>Los archivos están listos para ser descargados o consumidos por el plugin de Roblox.</em>`;
 
   showResult(html, 'success');
+  
+  // Configurar botón de envío al plugin
+  const sendBtn = document.getElementById('sendToPluginBtn');
+  if (sendBtn) {
+    sendBtn.addEventListener('click', () => {
+      sendCodeToPlugin(data, type);
+    });
+  }
 }
 
 function showResult(message, type = 'info') {
@@ -652,7 +663,77 @@ function displayMapResult(data) {
   });
 }
 
+// ============================================
+// CODE INJECTION FUNCTIONS
+// ============================================
+
+async function sendCodeToPlugin(data, systemType) {
+  const userId = getUserId();
+  
+  if (!userId) {
+    showToast('❌ Usuario no identificado', 'error');
+    return;
+  }
+
+  try {
+    // Obtener el código generado (está en los archivos)
+    let code = '';
+    
+    // Buscar código en el resultado
+    if (data.result && data.result.code) {
+      code = data.result.code;
+    } else if (data.files && typeof data.files === 'object') {
+      // Si hay múltiples archivos, concatenarlos
+      for (const [filename, content] of Object.entries(data.files)) {
+        if (typeof content === 'string') {
+          code += `-- File: ${filename}\n${content}\n\n`;
+        }
+      }
+    }
+
+    if (!code || code.length === 0) {
+      showToast('❌ No hay código para inyectar', 'error');
+      return;
+    }
+
+    showToast('⏳ Enviando código al plugin...', 'info');
+
+    const response = await fetch(`${API_URL}/api/plugin/inject`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId,
+        sessionId: generateUUID(),
+        code,
+        systemType,
+        description: promptInput.value || 'Sistema generado con DataShark IA'
+      }),
+    });
+
+    const result = await response.json();
+
+    if (result.success) {
+      showToast(`✅ Código enviado al plugin para inyección en Roblox Studio`, 'success');
+      showToast(`📍 El código se inyectará en: ${result.injection.target}`, 'success');
+    } else {
+      showToast(`❌ Error: ${result.error}`, 'error');
+    }
+  } catch (error) {
+    console.error('Error enviando al plugin:', error);
+    showToast(`❌ Error de conexión: ${error.message}`, 'error');
+  }
+}
+
+function generateUUID() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
+
 // Welcome message
 console.log('🦈 DataShark IA Frontend loaded');
 console.log(`Connecting to API at ${API_URL}`);
 console.log(`Your User ID: ${getUserId()}`);
+console.log('✅ Code Injection System READY');

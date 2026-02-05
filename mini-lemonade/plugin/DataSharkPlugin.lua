@@ -1214,7 +1214,139 @@ generateCodeBtn.MouseButton1Click:Connect(function()
 	generateCode()
 end)
 
-print("🦈 DataShark IA Plugin v2.0 loaded!")
+-- ===== CODE INJECTION SYSTEM =====
+-- Polling para detectar código pendiente para inyectar
+
+local InjectionSystem = {}
+
+function InjectionSystem.checkPendingCode()
+	if not state.userId or state.userId == 0 then
+		Logger.warn("Usuario no identificado, saltando polling")
+		return
+	end
+
+	task.spawn(function()
+		while true do
+			task.wait(2) -- Consultar cada 2 segundos
+
+			local url = state.backendUrl .. "/api/plugin/inject/pending/" .. tostring(state.userId)
+			
+			local success, response = pcall(function()
+				return HttpService:GetAsync(url, true)
+			end)
+
+			if success then
+				local decoded = HttpService:JSONDecode(response)
+				
+				if decoded.success and decoded.pending and #decoded.pending > 0 then
+					for _, injection in pairs(decoded.pending) do
+						InjectionSystem.injectCode(injection)
+					end
+				end
+			end
+		end
+	end)
+end
+
+function InjectionSystem.injectCode(injection)
+	Logger.log("Inyectando código: " .. injection.systemType)
+	
+	local code = injection.code
+	if not code or code == "" then
+		Logger.error("Código vacío para inyectar")
+		return
+	end
+
+	local scriptName = injection.systemType or "GeneratedSystem_" .. os.date("%H%M%S")
+	
+	-- Crear script en ServerScriptService
+	local success, err = pcall(function()
+		local script = Instance.new("LocalScript")
+		script.Name = scriptName
+		script.Source = code
+		script.Parent = ServerScriptService
+		
+		-- Guardar cambios en Undo
+		ChangeHistoryService:SetWaypoint("Inyectado: " .. scriptName)
+		
+		Logger.success("Código inyectado en: ServerScriptService > " .. scriptName)
+		
+		-- Confirmar al backend
+		InjectionSystem.confirmInjection(injection.id, scriptName, true, "")
+	end)
+	
+	if not success then
+		Logger.error("Error al inyectar código", err)
+		InjectionSystem.confirmInjection(injection.id, "", false, err)
+	end
+end
+
+function InjectionSystem.confirmInjection(injectionId, scriptName, wasSuccessful, errorMessage)
+	local url = state.backendUrl .. "/api/plugin/inject/injected"
+	
+	local payload = HttpService:JSONEncode({
+		injectionId = injectionId,
+		userId = tostring(state.userId),
+		systemType = state.currentSystemType,
+		scriptName = scriptName,
+		success = wasSuccessful,
+		message = errorMessage
+	})
+	
+	task.spawn(function()
+		local success, response = pcall(function()
+			return HttpService:PostAsync(url, payload)
+		end)
+		
+		if success then
+			Logger.success("Confirmación de inyección enviada al backend")
+		else
+			Logger.warn("No se pudo confirmar la inyección al backend")
+		end
+	end)
+end
+
+-- Iniciar polling de código
+InjectionSystem.checkPendingCode()
+
+-- ===== SEND CODE TO PLUGIN FUNCTION =====
+-- Función para que el backend envíe código para inyectar
+
+function sendCodeToPlugin(code, systemType, description)
+	Logger.log("Preparando envío de código para inyección: " .. (systemType or "unknown"))
+	
+	local url = state.backendUrl .. "/api/plugin/inject"
+	
+	local payload = HttpService:JSONEncode({
+		userId = tostring(state.userId),
+		sessionId = state.sessionId,
+		code = code,
+		systemType = systemType or "system",
+		description = description or ""
+	})
+	
+	local success, response = pcall(function()
+		return HttpService:PostAsync(url, payload)
+	end)
+	
+	if success then
+		local decoded = HttpService:JSONDecode(response)
+		if decoded.success then
+			Logger.success("Código enviado al servidor para inyección")
+			return true
+		else
+			Logger.error("Error enviando código: " .. (decoded.error or "unknown"))
+			return false
+		end
+	else
+		Logger.error("Error en comunicación: " .. tostring(response))
+		return false
+	end
+end
+
+print("🦈 DataShark IA Plugin v3.1 loaded!")
+print("✅ Code Injection System ACTIVADO")
 print("Backend: " .. getBackendUrl())
-print("Sistema de clarificación con IA integrado")
+print("Usuario ID: " .. tostring(state.userId))
+print("Sistema de clarificación con IA integrado + Inyección automática")
 

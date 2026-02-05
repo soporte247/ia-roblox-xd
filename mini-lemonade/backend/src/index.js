@@ -20,6 +20,7 @@ import logsRouter from './routes/logs.js';
 import clarifyRouter from './routes/clarify.js';
 import syncHistoryRouter from './routes/sync-history.js';
 import mapsRouter from './routes/maps.js';
+import pluginInjectionRouter from './routes/plugin-injection.js';
 import { initDB } from './services/database.js';
 import { requestLogger, requestTimeout, rateLimit } from './middleware/errorHandler.js';
 import { monitor } from './services/healthMonitor.js';
@@ -79,6 +80,9 @@ app.use('/api/keys', apiKeysRouter);
 
 // Rutas del Plugin
 app.use('/api/plugin', pluginRouter);
+
+// Rutas de Inyección de Código en Plugin
+app.use('/api/plugin/inject', pluginInjectionRouter);
 
 // Rutas de Logs (debugging y monitoreo)
 app.use('/api/logs', logsRouter);

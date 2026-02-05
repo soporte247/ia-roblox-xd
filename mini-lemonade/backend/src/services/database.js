@@ -149,6 +149,38 @@ export const initDB = async () => {
       )
     `);
 
+    // Inyecciones de código plugin
+    await dbRun(`
+      CREATE TABLE IF NOT EXISTS plugin_injections (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        userId TEXT NOT NULL,
+        sessionId TEXT,
+        systemType TEXT,
+        description TEXT,
+        codeLength INTEGER,
+        status TEXT DEFAULT 'sent',
+        scriptName TEXT,
+        injectedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+        completedAt DATETIME,
+        FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `);
+
+    // Inyecciones pendientes (para polling del plugin)
+    await dbRun(`
+      CREATE TABLE IF NOT EXISTS pending_injections (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        userId TEXT NOT NULL,
+        code TEXT NOT NULL,
+        systemType TEXT,
+        description TEXT,
+        status TEXT DEFAULT 'pending',
+        createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+        processedAt DATETIME,
+        FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `);
+
     console.log('✅ Database schema initialized');
   } catch (err) {
     console.error('❌ Error initializing database:', err);
