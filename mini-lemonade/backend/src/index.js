@@ -21,6 +21,7 @@ import clarifyRouter from './routes/clarify.js';
 import syncHistoryRouter from './routes/sync-history.js';
 import mapsRouter from './routes/maps.js';
 import pluginInjectionRouter from './routes/plugin-injection.js';
+import realtimeLogsRouter from './routes/realtime-logs.js';
 import { initDB } from './services/database.js';
 import { requestLogger, requestTimeout, rateLimit } from './middleware/errorHandler.js';
 import { monitor } from './services/healthMonitor.js';
@@ -86,6 +87,9 @@ app.use('/api/plugin/inject', pluginInjectionRouter);
 
 // Rutas de Logs (debugging y monitoreo)
 app.use('/api/logs', logsRouter);
+
+// Rutas de Logs en Tiempo Real (Server-Sent Events)
+app.use('/api/realtime-logs', realtimeLogsRouter);
 
 // Rutas de Clarificación (preguntas y respuestas)
 app.use('/api/clarify', clarifyRouter);

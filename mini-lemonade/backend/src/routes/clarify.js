@@ -7,6 +7,7 @@ import ClarificationManager from '../services/clarificationManager.js';
 import { generateSystem } from '../services/generator.js';
 import { ErrorLogger, RetryManager } from '../services/errorLogger.js';
 import { classifyPrompt } from '../services/classifier.js';
+import { addLog } from './realtime-logs.js';
 
 const router = express.Router();
 const clarificationManager = new ClarificationManager();
@@ -75,10 +76,14 @@ router.post('/', async (req, res) => {
       hasContext: true
     });
 
+    addLog(`🔍 Procesando clarificación para sistema ${detectedType}`, 'info', 'ai');
+
     // Generar código con contexto completo
     const result = await generateSystem(detectedType, enhancedPrompt, userId);
 
     if (result.success) {
+      addLog(`✅ Código generado con clarificación: ${detectedType}`, 'success', 'ai');
+      
       return res.json({
         success: true,
         code: result.code,

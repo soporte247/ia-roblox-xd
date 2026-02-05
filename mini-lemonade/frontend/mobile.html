@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>DataShark Mobile Editor</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .mobile-container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            max-width: 100%;
+        }
+
+        /* Header */
+        .mobile-header {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            padding: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .mobile-header h1 {
+            color: white;
+            font-size: 20px;
+            font-weight: 600;
+        }
+
+        .mobile-header .status {
+            font-size: 12px;
+            color: #4ade80;
+        }
+
+        /* Tab Navigation */
+        .tab-nav {
+            display: flex;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            padding: 0;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .tab-nav::-webkit-scrollbar {
+            display: none;
+        }
+
+        .tab-btn {
+            flex: 1;
+            min-width: 80px;
+            padding: 12px 20px;
+            background: transparent;
+            border: none;
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 14px;
+            border-bottom: 3px solid transparent;
+            cursor: pointer;
+            transition: all 0.3s;
+            white-space: nowrap;
+        }
+
+        .tab-btn.active {
+            color: white;
+            border-bottom-color: #4ade80;
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        /* Content Area */
+        .tab-content {
+            flex: 1;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .tab-pane {
+            display: none;
+            padding: 15px;
+            height: 100%;
+        }
+
+        .tab-pane.active {
+            display: block;
+        }
+
+        /* Editor */
+        #code-editor {
+            width: 100%;
+            height: calc(100% - 120px);
+            background: #1e1e1e;
+            color: #d4d4d4;
+            border: none;
+            border-radius: 8px;
+            padding: 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            resize: none;
+            line-height: 1.6;
+        }
+
+        .editor-toolbar {
+            display: flex;
+            gap: 10px;
+            padding: 10px 0;
+            flex-wrap: wrap;
+        }
+
+        .editor-btn {
+            flex: 1;
+            min-width: 80px;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            border: none;
+            border-radius: 6px;
+            color: white;
+            font-size: 14px;
+            cursor: pointer;
+            backdrop-filter: blur(10px);
+        }
+
+        .editor-btn:active {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        /* Console/Logs */
+        .console-window {
+            background: #1e1e1e;
+            border-radius: 8px;
+            padding: 15px;
+            height: calc(100% - 60px);
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            color: #d4d4d4;
+        }
+
+        .log-entry {
+            padding: 5px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .log-entry.info {
+            color: #4ade80;
+        }
+
+        .log-entry.error {
+            color: #ef4444;
+        }
+
+        .log-entry.warn {
+            color: #fbbf24;
+        }
+
+        /* Chat */
+        .chat-container {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .message {
+            max-width: 80%;
+            padding: 12px;
+            border-radius: 16px;
+            word-wrap: break-word;
+        }
+
+        .message.user {
+            background: #667eea;
+            color: white;
+            align-self: flex-end;
+            border-bottom-right-radius: 4px;
+        }
+
+        .message.ai {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            color: white;
+            align-self: flex-start;
+            border-bottom-left-radius: 4px;
+        }
+
+        .chat-input-area {
+            display: flex;
+            gap: 10px;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+        }
+
+        .chat-input {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            font-size: 14px;
+        }
+
+        .chat-input::placeholder {
+            color: rgba(255, 255, 255, 0.5);
+        }
+
+        .send-btn {
+            width: 50px;
+            height: 50px;
+            border: none;
+            border-radius: 50%;
+            background: #4ade80;
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .send-btn:active {
+            transform: scale(0.95);
+        }
+
+        /* Files List */
+        .file-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .file-item {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            padding: 15px;
+            border-radius: 8px;
+            color: white;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .file-name {
+            font-weight: 600;
+        }
+
+        .file-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .file-btn {
+            padding: 6px 12px;
+            background: rgba(255, 255, 255, 0.1);
+            border: none;
+            border-radius: 4px;
+            color: white;
+            font-size: 12px;
+            cursor: pointer;
+        }
+
+        /* Loading */
+        .loading {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 16px;
+            display: none;
+        }
+
+        .loading.active {
+            display: block;
+        }
+
+        /* Responsive */
+        @media (min-width: 768px) {
+            .mobile-container {
+                max-width: 768px;
+                margin: 0 auto;
+                border-radius: 12px;
+                overflow: hidden;
+                box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            }
+
+            body {
+                padding: 20px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="mobile-container">
+        <!-- Header -->
+        <div class="mobile-header">
+            <div>
+                <h1>🦈 DataShark</h1>
+                <div class="status" id="connection-status">● Conectado</div>
+            </div>
+        </div>
+
+        <!-- Tab Navigation -->
+        <div class="tab-nav">
+            <button class="tab-btn active" data-tab="chat">💬 Chat</button>
+            <button class="tab-btn" data-tab="editor">📝 Editor</button>
+            <button class="tab-btn" data-tab="files">📂 Archivos</button>
+            <button class="tab-btn" data-tab="console">🖥️ Consola</button>
+        </div>
+
+        <!-- Content Area -->
+        <div class="tab-content">
+            <!-- Chat Tab -->
+            <div class="tab-pane active" id="chat-pane">
+                <div class="chat-container">
+                    <div class="chat-messages" id="chat-messages">
+                        <div class="message ai">
+                            ¡Hola! Soy DataShark IA. ¿Qué sistema Lua quieres crear hoy?
+                        </div>
+                    </div>
+                    <div class="chat-input-area">
+                        <input type="text" class="chat-input" id="chat-input" placeholder="Escribe tu mensaje...">
+                        <button class="send-btn" id="send-btn">▶</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Editor Tab -->
+            <div class="tab-pane" id="editor-pane">
+                <div class="editor-toolbar">
+                    <button class="editor-btn" id="save-btn">💾 Guardar</button>
+                    <button class="editor-btn" id="format-btn">✨ Formatear</button>
+                    <button class="editor-btn" id="clear-btn">🗑️ Limpiar</button>
+                </div>
+                <textarea id="code-editor" placeholder="-- Escribe tu código Lua aquí...">-- DataShark Code Editor
+-- Ejemplo: Sistema de ataque básico
+
+local AttackSystem = {}
+
+function AttackSystem.new()
+    local self = {}
+    
+    function self:Attack(player, target)
+        if not target or not target:FindFirstChild("Humanoid") then
+            return false
+        end
+        
+        local damage = 10
+        target.Humanoid:TakeDamage(damage)
+        return true
+    end
+    
+    return self
+end
+
+return AttackSystem</textarea>
+            </div>
+
+            <!-- Files Tab -->
+            <div class="tab-pane" id="files-pane">
+                <div class="file-list" id="file-list">
+                    <div class="message ai" style="max-width: 100%;">
+                        No hay archivos generados aún. Usa el chat para crear sistemas Lua.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Console Tab -->
+            <div class="tab-pane" id="console-pane">
+                <div class="console-window" id="console-window">
+                    <div class="log-entry info">[INFO] Console iniciada</div>
+                    <div class="log-entry info">[INFO] Esperando logs...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="loading" id="loading">⏳ Generando...</div>
+
+    <script>
+        const API_URL = window.location.origin;
+        let currentFile = null;
+
+        // Tab switching
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const tabName = btn.dataset.tab;
+                
+                // Update buttons
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                
+                // Update panes
+                document.querySelectorAll('.tab-pane').forEach(pane => pane.classList.remove('active'));
+                document.getElementById(`${tabName}-pane`).classList.add('active');
+            });
+        });
+
+        // Chat functionality
+        const chatInput = document.getElementById('chat-input');
+        const sendBtn = document.getElementById('send-btn');
+        const chatMessages = document.getElementById('chat-messages');
+
+        function addMessage(content, isUser = false) {
+            const msg = document.createElement('div');
+            msg.className = `message ${isUser ? 'user' : 'ai'}`;
+            msg.textContent = content;
+            chatMessages.appendChild(msg);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        async function sendMessage() {
+            const message = chatInput.value.trim();
+            if (!message) return;
+
+            addMessage(message, true);
+            chatInput.value = '';
+            document.getElementById('loading').classList.add('active');
+
+            try {
+                const response = await fetch(`${API_URL}/api/generate`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        prompt: message,
+                        type: 'attack',
+                        userId: 'mobile-user'
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    addMessage(`✅ Sistema generado: ${data.files.join(', ')}`);
+                    updateFileList(data.files);
+                } else {
+                    addMessage(`❌ Error: ${data.message}`);
+                }
+            } catch (error) {
+                addMessage(`❌ Error de conexión: ${error.message}`);
+            }
+
+            document.getElementById('loading').classList.remove('active');
+        }
+
+        sendBtn.addEventListener('click', sendMessage);
+        chatInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') sendMessage();
+        });
+
+        // Editor functionality
+        const codeEditor = document.getElementById('code-editor');
+        const saveBtn = document.getElementById('save-btn');
+        const formatBtn = document.getElementById('format-btn');
+        const clearBtn = document.getElementById('clear-btn');
+
+        saveBtn.addEventListener('click', () => {
+            const code = codeEditor.value;
+            localStorage.setItem('datashark-code', code);
+            addLogEntry('Código guardado localmente', 'info');
+        });
+
+        formatBtn.addEventListener('click', () => {
+            // Basic Lua formatting
+            let code = codeEditor.value;
+            code = code.split('\n').map(line => line.trim()).join('\n');
+            codeEditor.value = code;
+            addLogEntry('Código formateado', 'info');
+        });
+
+        clearBtn.addEventListener('click', () => {
+            if (confirm('¿Borrar todo el código?')) {
+                codeEditor.value = '';
+            }
+        });
+
+        // File list
+        function updateFileList(files) {
+            const fileList = document.getElementById('file-list');
+            fileList.innerHTML = '';
+            
+            files.forEach(file => {
+                const item = document.createElement('div');
+                item.className = 'file-item';
+                item.innerHTML = `
+                    <span class="file-name">${file}</span>
+                    <div class="file-actions">
+                        <button class="file-btn" onclick="viewFile('${file}')">Ver</button>
+                        <button class="file-btn" onclick="downloadFile('${file}')">Descargar</button>
+                    </div>
+                `;
+                fileList.appendChild(item);
+            });
+        }
+
+        window.viewFile = function(filename) {
+            document.querySelector('[data-tab="editor"]').click();
+            addLogEntry(`Abriendo archivo: ${filename}`, 'info');
+        };
+
+        window.downloadFile = function(filename) {
+            addLogEntry(`Descargando: ${filename}`, 'info');
+        };
+
+        // Console/Logs con Server-Sent Events
+        function addLogEntry(message, type = 'info') {
+            const console = document.getElementById('console-window');
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${type}`;
+            const time = new Date().toLocaleTimeString();
+            entry.textContent = `[${time}] [${type.toUpperCase()}] ${message}`;
+            console.appendChild(entry);
+            console.scrollTop = console.scrollHeight;
+            
+            // Mantener solo últimos 50 logs
+            while (console.children.length > 50) {
+                console.removeChild(console.firstChild);
+            }
+        }
+
+        // Conectar a los logs en tiempo real usando Server-Sent Events
+        let eventSource = null;
+        
+        function connectRealtimeLogs() {
+            if (eventSource) {
+                eventSource.close();
+            }
+            
+            eventSource = new EventSource(`${API_URL}/api/realtime-logs/stream`);
+            
+            eventSource.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    
+                    if (data.type === 'initial') {
+                        // Cargar logs iniciales
+                        data.logs.forEach(log => {
+                            addLogEntry(log.message, log.type);
+                        });
+                    } else {
+                        // Nuevo log recibido
+                        addLogEntry(data.message, data.type);
+                    }
+                } catch (error) {
+                    console.error('Error parsing log:', error);
+                }
+            };
+            
+            eventSource.onerror = (error) => {
+                console.error('SSE Error:', error);
+                addLogEntry('Conexión perdida. Reintentando...', 'error');
+                
+                // Reintentar conexión después de 5 segundos
+                setTimeout(() => {
+                    addLogEntry('Reconectando...', 'info');
+                    connectRealtimeLogs();
+                }, 5000);
+            };
+            
+            eventSource.onopen = () => {
+                addLogEntry('Conectado a logs en tiempo real', 'success');
+            };
+        }
+        
+        // Iniciar conexión a logs en tiempo real
+        connectRealtimeLogs();
+
+        // Auto-refresh logs (polling) - REMOVIDO, ahora usamos SSE
+        // setInterval(async () => { ... }, 5000);
+
+        // Connection status
+        setInterval(() => {
+            fetch(`${API_URL}/api/health`)
+                .then(response => {
+                    document.getElementById('connection-status').textContent = '● Conectado';
+                    document.getElementById('connection-status').style.color = '#4ade80';
+                })
+                .catch(() => {
+                    document.getElementById('connection-status').textContent = '● Desconectado';
+                    document.getElementById('connection-status').style.color = '#ef4444';
+                });
+        }, 10000);
+
+        // Load saved code
+        const savedCode = localStorage.getItem('datashark-code');
+        if (savedCode) {
+            codeEditor.value = savedCode;
+        }
+
+        // Log initial message
+        addLogEntry('Editor móvil iniciado', 'info');
+        addLogEntry('Conectado a DataShark API', 'info');
+    </script>
+</body>
+</html>

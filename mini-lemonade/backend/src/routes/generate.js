@@ -4,6 +4,7 @@ import { generateSystem } from '../services/generator.js';
 import ResponseValidator from '../services/validator.js';
 import { ErrorLogger } from '../services/errorLogger.js';
 import { dbGet } from '../services/database.js';
+import { addLog } from './realtime-logs.js';
 
 const router = express.Router();
 
@@ -64,8 +65,11 @@ router.post('/', validateGenerateRequest, async (req, res) => {
     const { prompt, userId, systemType } = req.body;
 
     console.log(`[Generate] Request from user ${userId.substring(0, 8)}... - Type: ${systemType || 'auto'}`);
+    addLog(`Nueva solicitud de generación: ${prompt.substring(0, 50)}...`, 'info', 'user');
 
     const type = systemType || classifyPrompt(prompt);
+    addLog(`Tipo de sistema detectado: ${type}`, 'info', 'ai');
+    
     const result = await generateSystem(type, prompt.trim(), userId);
 
     const duration = Date.now() - startTime;
@@ -76,6 +80,8 @@ router.post('/', validateGenerateRequest, async (req, res) => {
         error: result.message,
         code: result.code
       });
+
+      addLog(`❌ Error en generación: ${result.message}`, 'error', 'ai');
 
       return res.status(500).json({ 
         error: result.message || 'Generation failed',
@@ -91,6 +97,8 @@ router.post('/', validateGenerateRequest, async (req, res) => {
       method: result.method,
       filesWritten: result.files?.length || 0
     });
+
+    addLog(`✅ Sistema ${type} generado exitosamente (${result.files?.length || 0} archivos)`, 'success', 'ai');
 
     console.log(`[Generate] Completed in ${duration}ms - Success: ${result.success}`);
 
