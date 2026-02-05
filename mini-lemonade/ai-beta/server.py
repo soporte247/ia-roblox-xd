@@ -29,31 +29,41 @@ class ChatCompletionResponse(BaseModel):
 
 def load_model():
     model_path = os.environ.get('BETA_MODEL_PATH', os.path.join(os.path.dirname(__file__), 'model.pt'))
+    
+    # If model doesn't exist, return None tuple (server will gracefully handle this)
     if not os.path.exists(model_path):
-        raise FileNotFoundError(f"Model not found: {model_path}")
+        print(f"⚠️  Model not found: {model_path}")
+        print("   Server will run without model - backend will use other providers (DeepSeek, OpenAI, Ollama)")
+        return None, None, None
 
-    ckpt = torch.load(model_path, map_location='cpu')
-    itos = ckpt['meta']['itos']
-    tokenizer = Tokenizer(itos)
+    try:
+        ckpt = torch.load(model_path, map_location='cpu')
+        itos = ckpt['meta']['itos']
+        tokenizer = Tokenizer(itos)
 
-    # Inferir block_size real del checkpoint
-    actual_block_size = ckpt['model']['pos_emb.weight'].shape[0]
+        # Inferir block_size real del checkpoint
+        actual_block_size = ckpt['model']['pos_emb.weight'].shape[0]
 
-    cfg = GPTConfig(
-        vocab_size=len(itos),
-        block_size=actual_block_size,
-        n_layer=ckpt['config']['n_layer'],
-        n_head=ckpt['config']['n_head'],
-        n_embd=ckpt['config']['n_embd'],
-        dropout=ckpt['config']['dropout'],
-    )
+        cfg = GPTConfig(
+            vocab_size=len(itos),
+            block_size=actual_block_size,
+            n_layer=ckpt['config']['n_layer'],
+            n_head=ckpt['config']['n_head'],
+            n_embd=ckpt['config']['n_embd'],
+            dropout=ckpt['config']['dropout'],
+        )
 
-    device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    model = GPT(cfg).to(device)
-    model.load_state_dict(ckpt['model'])
-    model.eval()
+        device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        model = GPT(cfg).to(device)
+        model.load_state_dict(ckpt['model'])
+        model.eval()
 
-    return model, tokenizer, device
+        print(f"✅ Model loaded from: {model_path}")
+        return model, tokenizer, device
+    except Exception as e:
+        print(f"❌ Error loading model: {e}")
+        print("   Server will run without model - backend will use other providers")
+        return None, None, None
 
 
 app = FastAPI()
@@ -76,7 +86,7 @@ def health():
 @app.post("/v1/chat/completions", response_model=ChatCompletionResponse)
 def chat_completions(req: ChatCompletionRequest):
     if _model is None or _tokenizer is None:
-        raise HTTPException(status_code=500, detail="Model not loaded")
+        raise HTTPException(status_code=503, detail="Model not available. Backend will use alternative providers (DeepSeek, OpenAI, Ollama)")
 
     prompt = ""
     for m in req.messages:
