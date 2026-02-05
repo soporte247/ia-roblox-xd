@@ -12,12 +12,79 @@ class ClarificationManager {
     this.deepseekBaseURL = process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com';
     this.deepseekModel = process.env.DEEPSEEK_MODEL || 'deepseek-chat';
 
+    this.betaModelBaseURL = process.env.BETA_MODEL_BASE_URL || '';
+    this.betaModelApiKey = process.env.BETA_MODEL_API_KEY || '';
+    this.betaModelName = process.env.BETA_MODEL_NAME || 'datashark-beta';
+
     this.ollamaBaseURL = process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
     this.ollamaModel = process.env.OLLAMA_MODEL || 'qwen2.5-coder:7b';
 
     // Configuración de timeout y retry
     this.timeout = parseInt(process.env.AI_TIMEOUT || '30000'); // 30s por defecto
     this.maxRetries = parseInt(process.env.AI_MAX_RETRIES || '2'); // 2 reintentos
+  }
+
+  /**
+   * Llama a Beta Model para generar preguntas de clarificación
+   */
+  async callBetaModel(prompt) {
+    const startTime = Date.now();
+    try {
+      const operation = async () => {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), this.timeout);
+
+        try {
+          const headers = { 'Content-Type': 'application/json' };
+
+          if (this.betaModelApiKey) {
+            headers.Authorization = `Bearer ${this.betaModelApiKey}`;
+          }
+
+          const response = await fetch(`${this.betaModelBaseURL}/v1/chat/completions`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({
+              model: this.betaModelName,
+              messages: [
+                {
+                  role: 'system',
+                  content: 'Responde SOLO con JSON válido. No agregues texto adicional.'
+                },
+                {
+                  role: 'user',
+                  content: prompt
+                }
+              ],
+              temperature: 0.7,
+              max_tokens: 500
+            }),
+            signal: controller.signal
+          });
+
+          clearTimeout(timeoutId);
+
+          if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Beta model error: ${response.status} - ${errorText}`);
+          }
+
+          const data = await response.json();
+          const result = data?.choices?.[0]?.message?.content || '';
+
+          metricsService.trackAICall('beta', true, Date.now() - startTime);
+          return result;
+        } finally {
+          clearTimeout(timeoutId);
+        }
+      };
+
+      return await this.withRetry(operation, this.maxRetries);
+    } catch (error) {
+      console.error('❌ Error calling Beta model:', error.message);
+      metricsService.trackAICall('beta', false, Date.now() - startTime);
+      return null;
+    }
   }
 
   /**
@@ -207,8 +274,14 @@ Formato: Devuelve SOLO JSON: { "questions": ["pregunta 1", "pregunta 2", ...] }`
       const finalPrompt = systemPrompts[systemType] || systemPrompts.attack;
       let response = null;
 
+      // Intentar Beta Model primero (si está configurado)
+      if (this.betaModelBaseURL) {
+        console.log('🧪 Generando preguntas con Beta Model...');
+        response = await this.callBetaModel(finalPrompt);
+      }
+
       // Intentar DeepSeek primero
-      if (this.deepseekApiKey) {
+      if (!response && this.deepseekApiKey) {
         console.log('🤖 Generando preguntas con DeepSeek...');
         response = await this.callDeepSeek(finalPrompt);
       }

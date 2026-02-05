@@ -14,6 +14,7 @@ class MetricsService {
         success: 0
       },
       ai: {
+        beta: { calls: 0, successes: 0, failures: 0, totalTime: 0 },
         deepseek: { calls: 0, successes: 0, failures: 0, totalTime: 0 },
         ollama: { calls: 0, successes: 0, failures: 0, totalTime: 0 },
         templates: { uses: 0 }
@@ -180,6 +181,15 @@ class MetricsService {
         : 0,
       ai: {
         ...this.metrics.ai,
+        beta: {
+          ...this.metrics.ai.beta,
+          successRate: this.metrics.ai.beta.calls > 0
+            ? ((this.metrics.ai.beta.successes / this.metrics.ai.beta.calls) * 100).toFixed(2)
+            : 0,
+          avgTime: this.metrics.ai.beta.calls > 0
+            ? Math.round(this.metrics.ai.beta.totalTime / this.metrics.ai.beta.calls)
+            : 0
+        },
         deepseek: {
           ...this.metrics.ai.deepseek,
           successRate: this.metrics.ai.deepseek.calls > 0
@@ -243,6 +253,7 @@ class MetricsService {
     this.metrics = {
       requests: { total: 0, byRoute: {}, byMethod: {}, errors: 0, success: 0 },
       ai: {
+        beta: { calls: 0, successes: 0, failures: 0, totalTime: 0 },
         deepseek: { calls: 0, successes: 0, failures: 0, totalTime: 0 },
         ollama: { calls: 0, successes: 0, failures: 0, totalTime: 0 },
         templates: { uses: 0 }

@@ -19,6 +19,11 @@ const deepseekApiKey = process.env.DEEPSEEK_API_KEY;
 const deepseekBaseURL = process.env.DEEPSEEK_BASE_URL || 'https://api.deepseek.com';
 const deepseekModel = process.env.DEEPSEEK_MODEL || 'deepseek-chat';
 
+// Beta Model Configuration (OpenAI-compatible)
+const betaModelBaseURL = process.env.BETA_MODEL_BASE_URL || '';
+const betaModelApiKey = process.env.BETA_MODEL_API_KEY || '';
+const betaModelName = process.env.BETA_MODEL_NAME || 'datashark-beta';
+
 // Logger utility
 function logInfo(message, data = {}) {
   console.log(`[Generator] ${message}`, data);
@@ -89,10 +94,18 @@ export async function generateSystem(type, prompt = '', userId = 'default') {
   let generationMethod = 'template';
   let lastError = null;
 
-  // Try to generate with AI (Priority: DeepSeek -> OpenAI -> Ollama -> Template)
-  if (deepseekApiKey || process.env.OPENAI_API_KEY || process.env.OLLAMA_MODEL) {
+  // Try to generate with AI (Priority: Beta -> DeepSeek -> OpenAI -> Ollama -> Template)
+  if (betaModelBaseURL || deepseekApiKey || process.env.OPENAI_API_KEY || process.env.OLLAMA_MODEL) {
     try {
-      if (deepseekApiKey) {
+      if (betaModelBaseURL) {
+        logInfo('Using Beta model for generation');
+        files = await RetryManager.executeWithRetry(
+          () => generateWithBetaModel(prompt, type),
+          2, // max 2 retries for Beta
+          1000
+        );
+        generationMethod = 'beta';
+      } else if (deepseekApiKey) {
         logInfo('Using DeepSeek for generation');
         files = await RetryManager.executeWithRetry(
           () => generateWithDeepSeek(prompt, type),
@@ -244,6 +257,86 @@ function getDefaultTemplate(type) {
       return questTemplate();
     default:
       return {};
+  }
+}
+
+async function generateWithBetaModel(prompt, type = 'attack') {
+  const systemMessage = `You are an expert Roblox Lua engineer specializing in scalable game systems.
+
+Generate a complete, production-ready ${type} system based on the user's requirements.
+
+CRITICAL RULES:
+1. Return ONLY valid JSON wrapped in {}
+2. Start with { and end with } - NO markdown blocks, NO explanations before/after
+3. Use Roblox best practices (RemoteEvents, proper service architecture)
+4. Include detailed comments explaining key functionality
+5. Make code modular and maintainable
+6. Add sanity checks and error handling
+7. Follow Roblox naming conventions
+8. Ensure balanced parentheses, brackets, and braces
+9. Include server AND client code when needed
+
+Required JSON format:
+{
+  "files": {
+    "ServiceName.lua": "-- Complete server-side code here",
+    "ClientScript.lua": "-- Complete client-side code here"
+  }
+}
+
+VALIDATION REQUIREMENTS:
+- All Lua code must have balanced braces, brackets, parentheses
+- Every function must have a matching 'end'
+- All strings must be properly quoted
+- Code must be syntactically valid Lua
+- Generate minimum 3-4 files for a complete system`;
+
+  const userMessage = `Create a ${type} system with these specific requirements: ${prompt}\n\nReturn ONLY JSON, starting with { and ending with }. No markdown, no explanations.`;
+
+  try {
+    logInfo('Calling Beta model API');
+
+    const headers = {
+      'Content-Type': 'application/json'
+    };
+
+    if (betaModelApiKey) {
+      headers.Authorization = `Bearer ${betaModelApiKey}`;
+    }
+
+    const response = await fetch(`${betaModelBaseURL}/v1/chat/completions`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        model: betaModelName,
+        messages: [
+          { role: 'system', content: systemMessage },
+          { role: 'user', content: userMessage }
+        ],
+        temperature: 0.1,
+        max_tokens: 4000
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Beta model API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const content = data?.choices?.[0]?.message?.content?.trim();
+
+    if (!content) {
+      throw new Error('Empty response from Beta model');
+    }
+
+    // Validate and parse response
+    const files = ResponseValidator.validateJsonResponse(content, type);
+
+    logInfo('Beta model generation successful', { fileCount: Object.keys(files).length });
+    return files;
+  } catch (error) {
+    logError('Beta model generation failed', { error: error.message });
+    throw error; // Let retry logic handle this
   }
 }
 
