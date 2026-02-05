@@ -53,6 +53,7 @@ const API_URL = 'http://localhost:3000';
 let currentFiles = {};
 let userId = null;
 let isCodeEditable = false;
+let pluginConnected = {}; // Almacenar estado de conexión por userId
 
 // Get or create userId
 function getUserId() {
@@ -72,6 +73,93 @@ function generateUUID() {
     const v = c === 'x' ? r : (r & 0x3 | 0x8);
     return v.toString(16);
   });
+}
+
+// Verificar si el plugin está conectado
+function isPluginConnected(userId) {
+  // Primero revisar localStorage
+  const stored = localStorage.getItem(`pluginConnected-${userId}`);
+  if (stored === 'true') {
+    return true;
+  }
+  
+  // Si no está guardado, devolver false
+  return pluginConnected[userId] === true;
+}
+
+// Marcar plugin como conectado
+function setPluginConnected(userId, connected = true) {
+  pluginConnected[userId] = connected;
+  localStorage.setItem(`pluginConnected-${userId}`, connected ? 'true' : 'false');
+}
+
+// Modal de conexión al plugin
+function showPluginConnectionModal(userId) {
+  const modal = document.createElement('div');
+  modal.className = 'modal';
+  modal.id = 'pluginConnectionModal';
+  modal.innerHTML = `
+    <div class="modal-content" style="max-width: 500px;">
+      <div class="modal-header">
+        <h2>🔌 Conectar al Plugin</h2>
+        <button class="modal-close" onclick="document.getElementById('pluginConnectionModal').remove()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p style="margin-bottom: 15px; color: #666;">
+          Para generar código y sincronizarlo automáticamente con Roblox Studio, necesitas conectar el plugin DataShark.
+        </p>
+        
+        <div style="background: #f0f4f8; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+          <h3 style="margin-top: 0; font-size: 14px; color: #333;">Tu ID de Usuario:</h3>
+          <div style="background: white; padding: 12px; border-radius: 4px; font-family: monospace; word-break: break-all; font-size: 12px; color: #0066cc; border: 1px solid #ddd;">
+            ${userId}
+          </div>
+          <button class="btn btn-sm" onclick="window.optimizer.copyToClipboard('${userId}'); showToast('ID copiado', 'success');" style="margin-top: 10px; width: 100%;">
+            📋 Copiar ID
+          </button>
+        </div>
+
+        <div style="background: #fff3cd; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #ffc107;">
+          <h3 style="margin-top: 0; font-size: 14px; color: #856404;">Pasos para conectar:</h3>
+          <ol style="margin: 10px 0; padding-left: 20px; color: #856404; font-size: 14px;">
+            <li>Abre Roblox Studio</li>
+            <li>Ve a <strong>Plugins → DataShark IA</strong></li>
+            <li>Pega tu ID en el campo de conexión</li>
+            <li>Haz clic en "Conectar"</li>
+          </ol>
+        </div>
+
+        <div style="background: #d4edda; padding: 15px; border-radius: 8px; border-left: 4px solid #28a745;">
+          <h3 style="margin-top: 0; font-size: 14px; color: #155724;">¿Ya conectaste el plugin?</h3>
+          <p style="margin: 10px 0; color: #155724; font-size: 14px;">
+            Si ya ingresaste tu ID en el plugin, haz clic en "Confirmar Conexión" abajo.
+          </p>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn" onclick="document.getElementById('pluginConnectionModal').remove()">
+          Conectar Luego
+        </button>
+        <button class="btn btn-primary" onclick="confirmPluginConnection('${userId}')">
+          ✅ Confirmar Conexión
+        </button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  
+  // Animar entrada
+  setTimeout(() => {
+    modal.classList.add('show');
+  }, 10);
+}
+
+// Confirmar conexión al plugin
+function confirmPluginConnection(userId) {
+  setPluginConnected(userId, true);
+  document.getElementById('pluginConnectionModal').remove();
+  window.optimizer.showNotification('✅ Plugin conectado correctamente', 'success');
+  showToast('Ya puedes generar y sincronizar código', 'success');
 }
 
 // Dark mode
@@ -153,9 +241,16 @@ checkServerStatus();
 async function handleGenerate() {
   const prompt = promptInput.value.trim();
   const systemType = systemTypeSelect.value;
+  const currentUserId = getUserId();
 
   if (!prompt) {
     window.optimizer.showNotification('⚠️ Por favor, escribe una descripción del sistema', 'warning');
+    return;
+  }
+
+  // Validar conexión al plugin
+  if (!isPluginConnected(currentUserId)) {
+    showPluginConnectionModal(currentUserId);
     return;
   }
 

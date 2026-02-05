@@ -3,6 +3,7 @@ import { classifyPrompt } from '../services/classifier.js';
 import { generateSystem } from '../services/generator.js';
 import ResponseValidator from '../services/validator.js';
 import { ErrorLogger } from '../services/errorLogger.js';
+import { dbGet } from '../services/database.js';
 
 const router = express.Router();
 
@@ -31,7 +32,8 @@ function validateGenerateRequest(req, res, next) {
   if (!userId || typeof userId !== 'string') {
     return res.status(400).json({ 
       error: 'UserId is required and must be a string',
-      field: 'userId'
+      field: 'userId',
+      message: 'El plugin de Roblox Studio no está conectado. Por favor, conecta tu ID de usuario en el plugin para sincronizar código.'
     });
   }
 
@@ -40,7 +42,8 @@ function validateGenerateRequest(req, res, next) {
   if (!uuidRegex.test(userId)) {
     return res.status(400).json({ 
       error: 'UserId must be a valid UUID',
-      field: 'userId'
+      field: 'userId',
+      message: 'El ID de usuario tiene un formato inválido. Por favor, verifica que hayas copiado correctamente el ID del navegador.'
     });
   }
 
