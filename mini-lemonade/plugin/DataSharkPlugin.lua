@@ -59,6 +59,8 @@ local state = {
 	responseCache = {}
 }
 
+local updateHistoryView
+
 -- ===== HERRAMIENTAS AUXILIARES =====
 
 -- Logger mejorado
