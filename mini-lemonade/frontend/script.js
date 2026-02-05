@@ -94,6 +94,19 @@ function setPluginConnected(userId, connected = true) {
 }
 
 // Modal de conexión al plugin
+// Cerrar modal de conexión al plugin
+function closePluginConnectionModal() {
+  const modal = document.getElementById('pluginConnectionModal');
+  if (modal) {
+    modal.style.animation = 'fadeOut 0.3s ease-out';
+    setTimeout(() => {
+      if (modal && modal.parentNode) {
+        modal.remove();
+      }
+    }, 300);
+  }
+}
+
 function showPluginConnectionModal(userId) {
   const modal = document.createElement('div');
   modal.className = 'modal';
@@ -102,7 +115,7 @@ function showPluginConnectionModal(userId) {
     <div class="modal-content" style="max-width: 500px;">
       <div class="modal-header">
         <h2>🔌 Conectar al Plugin</h2>
-        <button class="modal-close" onclick="document.getElementById('pluginConnectionModal').remove()">&times;</button>
+        <button class="modal-close" onclick="closePluginConnectionModal()">&times;</button>
       </div>
       <div class="modal-body">
         <p style="margin-bottom: 15px; color: #666;">
@@ -137,7 +150,7 @@ function showPluginConnectionModal(userId) {
         </div>
       </div>
       <div class="modal-footer">
-        <button class="btn" onclick="document.getElementById('pluginConnectionModal').remove()">
+        <button class="btn" onclick="closePluginConnectionModal()">
           Conectar Luego
         </button>
         <button class="btn btn-primary" onclick="confirmPluginConnection('${userId}')">
@@ -157,7 +170,10 @@ function showPluginConnectionModal(userId) {
 // Confirmar conexión al plugin
 function confirmPluginConnection(userId) {
   setPluginConnected(userId, true);
-  document.getElementById('pluginConnectionModal').remove();
+  const modal = document.getElementById('pluginConnectionModal');
+  if (modal) {
+    modal.remove();
+  }
   window.optimizer.showNotification('✅ Plugin conectado correctamente', 'success');
   showToast('Ya puedes generar y sincronizar código', 'success');
 }

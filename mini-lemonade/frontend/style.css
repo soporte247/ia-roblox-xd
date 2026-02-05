@@ -343,6 +343,15 @@
   }
 }
 
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
 /* RESPONSIVE */
 @media (max-width: 1024px) {
   .hero {
@@ -898,6 +907,24 @@ body.dark-mode .modal-content {
 
 .modal-close:hover {
   color: var(--error);
+}
+
+.modal-body {
+  padding: 20px 0;
+  min-height: 100px;
+}
+
+.modal-footer {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  padding-top: 15px;
+  border-top: 2px solid var(--border);
+  margin-top: 20px;
+}
+
+.modal-footer .btn {
+  margin: 0;
 }
 
 .history-list,
