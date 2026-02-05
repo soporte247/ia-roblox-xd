@@ -283,6 +283,33 @@ function showLoading(show) {
   loadingDiv.classList.toggle('hidden', !show);
 }
 
+function showToast(message, type = 'info') {
+  const toast = document.createElement('div');
+  toast.className = `toast toast-${type}`;
+  toast.textContent = message;
+  toast.style.cssText = `
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    padding: 15px 20px;
+    background: ${type === 'success' ? '#4CAF50' : type === 'error' ? '#f44336' : '#2196F3'};
+    color: white;
+    border-radius: 4px;
+    z-index: 10000;
+    max-width: 300px;
+    word-wrap: break-word;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+    animation: slideIn 0.3s ease-in-out;
+  `;
+  
+  document.body.appendChild(toast);
+  
+  setTimeout(() => {
+    toast.style.animation = 'slideOut 0.3s ease-in-out';
+    setTimeout(() => toast.remove(), 300);
+  }, 3000);
+}
+
 async function fetchGeneratedFiles() {
   try {
     const response = await fetch(`${API_URL}/fetch?userId=${getUserId()}`);
