@@ -136,6 +136,9 @@ function Http.request(url, method, body, timeout)
 	return nil
 end
 
+-- ===== FORWARD DECLARATIONS =====
+local updateHistoryView
+
 -- ===== UI FACTORY =====
 local UI = {}
 
@@ -721,7 +724,7 @@ clearHistoryBtn.MouseButton1Click:Connect(function()
 end)
 
 -- Actualizar vista de historial
-local function updateHistoryView()
+updateHistoryView = function()
 	if #state.history == 0 then
 		historyBox.Text = "(sin historial)"
 		return
