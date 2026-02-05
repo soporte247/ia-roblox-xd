@@ -1,7 +1,23 @@
 import express from 'express';
-import { getDatabase } from '../services/database.js';
+import sqlite3 from 'sqlite3';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
 
 const router = express.Router();
+
+// Configurar base de datos
+const __dirname = dirname(fileURLToPath(import.meta.url));
+let dbPath;
+if (process.env.DATABASE_URL) {
+  dbPath = process.env.DATABASE_URL;
+} else if (process.env.NODE_ENV === 'production') {
+  dbPath = '/tmp/database.sqlite';
+} else {
+  dbPath = path.join(__dirname, '..', '..', 'database.sqlite');
+}
+
+const db = new sqlite3.Database(dbPath);
 
 /**
  * POST /api/plugin/inject
@@ -21,7 +37,6 @@ router.post('/inject', async (req, res) => {
     console.log(`[INJECT] Inyectando código para usuario ${userId}, tipo: ${systemType}`);
 
     // Guardar en BD que se inyectó
-    const db = getDatabase();
     const timestamp = new Date().toISOString();
 
     db.run(
@@ -63,7 +78,6 @@ router.post('/inject', async (req, res) => {
 router.get('/pending/:userId', async (req, res) => {
   try {
     const { userId } = req.params;
-    const db = getDatabase();
 
     db.all(
       `SELECT * FROM pending_injections 
@@ -105,7 +119,6 @@ router.post('/injected', async (req, res) => {
 
     console.log(`[INJECTED] Plugin confirmó inyección de ${systemType}`);
 
-    const db = getDatabase();
     const timestamp = new Date().toISOString();
 
     // Actualizar estado en BD
@@ -146,7 +159,6 @@ router.post('/injected', async (req, res) => {
 router.get('/injections/:userId', async (req, res) => {
   try {
     const { userId } = req.params;
-    const db = getDatabase();
 
     db.all(
       `SELECT * FROM plugin_injections 
@@ -178,4 +190,4 @@ router.get('/injections/:userId', async (req, res) => {
   }
 });
 
-export default router;
+export default router;export default router;
