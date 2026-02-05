@@ -41,7 +41,8 @@ function startBetaModel() {
   console.log('🤖 Starting beta model Python on port 8000...');
   
   const env = { ...process.env };
-  env.BETA_MODEL_PATH = '/tmp/datashark-model.pt';
+  // Let server.py use default model path (model.pt in same directory)
+  // env.BETA_MODEL_PATH can be overridden via environment variable if needed
   env.PYTHONUNBUFFERED = '1';
 
   const beta = spawn('python', ['-m', 'uvicorn', 'server:app', '--host', '0.0.0.0', '--port', '8000'], {
