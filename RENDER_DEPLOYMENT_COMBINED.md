@@ -13,8 +13,20 @@
 En https://dashboard.render.com:
 
 1. **Actualizar servicio existente (datashark-ia2)**
-   - Build Command: `pip install -r mini-lemonade/ai-beta/requirements.txt && npm install --prefix mini-lemonade/backend`
-   - Start Command: `node start-combined.js`
+   
+   **IMPORTANTE:** Debes actualizar manualmente en el dashboard de Render:
+   
+   - **Build Command:**
+     ```bash
+     pip install -r mini-lemonade/ai-beta/requirements.txt && npm install --prefix mini-lemonade/backend
+     ```
+   
+   - **Start Command:**
+     ```bash
+     node start-combined.js
+     ```
+   
+   **Nota:** El Procfile solo contiene el Start Command. El Build Command SE CONFIGURA ÚNICAMENTE EN EL DASHBOARD.
 
 2. **Environment Variables** (En el servicio):
    ```
