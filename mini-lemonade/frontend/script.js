@@ -35,6 +35,7 @@ const copyBtn = document.getElementById('copyBtn');
 const exportBtn = document.getElementById('exportBtn');
 const historyBtn = document.getElementById('historyBtn');
 const templatesBtn = document.getElementById('templatesBtn');
+const mapsBtn = document.getElementById('mapsBtn');
 const darkModeToggle = document.getElementById('darkModeToggle');
 const saveCodeBtn = document.getElementById('saveCodeBtn');
 const promptInput = document.getElementById('prompt');
@@ -46,6 +47,7 @@ const tabs = document.querySelectorAll('.tab');
 const tabContents = document.querySelectorAll('.tab-content');
 const historyModal = document.getElementById('historyModal');
 const templatesModal = document.getElementById('templatesModal');
+const mapsModal = document.getElementById('mapsModal');
 
 const API_URL = 'http://localhost:3000';
 let currentFiles = {};
@@ -93,6 +95,7 @@ copyBtn.addEventListener('click', handleCopy);
 exportBtn.addEventListener('click', handleExport);
 historyBtn.addEventListener('click', showHistory);
 templatesBtn.addEventListener('click', showTemplates);
+mapsBtn.addEventListener('click', showMapsGenerator);
 saveCodeBtn.addEventListener('click', saveEditedCode);
 
 // Autoguardado con debounce
@@ -120,11 +123,12 @@ document.querySelectorAll('.modal-close').forEach(btn => {
   btn.addEventListener('click', () => {
     historyModal.classList.add('hidden');
     templatesModal.classList.add('hidden');
+    mapsModal.classList.add('hidden');
   });
 });
 
 // Close modals on outside click
-[historyModal, templatesModal].forEach(modal => {
+[historyModal, templatesModal, mapsModal].forEach(modal => {
   modal.addEventListener('click', (e) => {
     if (e.target === modal) {
       modal.classList.add('hidden');
@@ -386,22 +390,27 @@ async function handleExport() {
 
 async function showHistory() {
   try {
-    const response = await fetch(`${API_URL}/history?userId=${getUserId()}`);
+    // Obtener historial sincronizado (que incluye plugin + web)
+    const userId = getUserId();
+    const response = await fetch(`${API_URL}/api/sync-history/${userId}?limit=30`);
     const data = await response.json();
     
     const historyList = document.getElementById('historyList');
     
-    if (!data.history || data.history.length === 0) {
+    if (!data.success || !data.history || data.history.length === 0) {
       historyList.innerHTML = '<p class="empty-state">No hay historial aún</p>';
     } else {
-      historyList.innerHTML = data.history.map(item => `
+      historyList.innerHTML = data.history.map((item, idx) => `
         <div class="history-item" onclick="loadFromHistory(${item.id})">
           <div class="history-item-header">
-            <span class="history-item-title">${item.type.toUpperCase()} System</span>
-            <span class="history-item-date">${new Date(item.timestamp).toLocaleString()}</span>
+            <span class="history-item-title">${(item.systemType || 'unknown').toUpperCase()} System</span>
+            <span class="history-item-date">${new Date(item.createdAt).toLocaleString()}</span>
+            <span class="history-source" style="font-size: 0.8em; color: #888; margin-left: auto;">
+              ${item.source === 'plugin' ? '🦈 Plugin' : '💻 Web'}
+            </span>
           </div>
-          <div class="history-item-prompt">${item.prompt}</div>
-          <small>${item.fileCount} archivos</small>
+          <div class="history-item-prompt">${item.originalPrompt.substring(0, 100)}...</div>
+          ${item.answers ? `<small>${item.answers.length} respuestas</small>` : ''}
         </div>
       `).join('');
     }
@@ -409,11 +418,14 @@ async function showHistory() {
     historyModal.classList.remove('hidden');
   } catch (error) {
     console.error('Error loading history:', error);
+    const historyList = document.getElementById('historyList');
+    historyList.innerHTML = '<p class="empty-state">Error al cargar historial</p>';
   }
 }
 
 window.loadFromHistory = function(id) {
-  fetch(`${API_URL}/history?userId=${getUserId()}`)
+  const userId = getUserId();
+  fetch(`${API_URL}/api/sync-history/${userId}`)
     .then(r => r.json())
     .then(data => {
       const item = data.history.find(h => h.id === id);
@@ -503,6 +515,142 @@ function displayUserId() {
 }
 
 setTimeout(displayUserId, 1000);
+
+// ============================================
+// MAPS GENERATOR FUNCTIONS
+// ============================================
+
+async function showMapsGenerator() {
+  mapsModal.classList.remove('hidden');
+  setupMapsEventListeners();
+}
+
+function setupMapsEventListeners() {
+  const generateMapBtn = document.getElementById('generateMapBtn');
+  const presetBtns = document.querySelectorAll('.preset-btn');
+
+  generateMapBtn.addEventListener('click', generateCustomMap);
+
+  presetBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const type = btn.dataset.type;
+      generatePresetMap(type);
+    });
+  });
+}
+
+async function generateCustomMap() {
+  const description = document.getElementById('mapDescription').value;
+  const width = parseInt(document.getElementById('mapWidth').value) || 20;
+  const height = parseInt(document.getElementById('mapHeight').value) || 15;
+
+  if (!description.trim()) {
+    showToast('Por favor describe el mapa que deseas', 'error');
+    return;
+  }
+
+  try {
+    const response = await fetch(`${API_URL}/api/maps/generate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        description,
+        width,
+        height,
+        format: 'all',
+      }),
+    });
+
+    const data = await response.json();
+
+    if (data.success) {
+      displayMapResult(data);
+    } else {
+      showToast('Error generando mapa: ' + data.error, 'error');
+    }
+  } catch (error) {
+    showToast('Error: ' + error.message, 'error');
+  }
+}
+
+async function generatePresetMap(type) {
+  try {
+    const width = parseInt(document.getElementById('mapWidth').value) || 20;
+    const height = parseInt(document.getElementById('mapHeight').value) || 15;
+
+    const response = await fetch(`${API_URL}/api/maps/generate/${type}?width=${width}&height=${height}`);
+    const data = await response.json();
+
+    if (data.success) {
+      displayMapResult(data);
+    } else {
+      showToast('Error generando mapa', 'error');
+    }
+  } catch (error) {
+    showToast('Error: ' + error.message, 'error');
+  }
+}
+
+function displayMapResult(data) {
+  const outputDiv = document.getElementById('mapOutput');
+  const vizDiv = document.getElementById('mapVisualization');
+
+  let html = `
+    <div class="map-result">
+      <h3>🗺️ Mapa Generado</h3>
+      <div class="map-ascii">
+        <pre>${data.map.ascii || data.map}</pre>
+      </div>
+  `;
+
+  if (data.map.legend) {
+    html += `
+      <div class="map-legend">
+        <h4>Leyenda:</h4>
+        <pre>${data.map.legend}</pre>
+      </div>
+    `;
+  }
+
+  html += `
+    <div class="map-controls">
+      <button class="btn btn-primary copy-map-btn">📋 Copiar Mapa ASCII</button>
+      <button class="btn btn-secondary download-lua-btn">💾 Descargar Código Lua</button>
+    </div>
+  `;
+
+  if (data.svg) {
+    html += `
+      <h3>Visualización SVG</h3>
+      <div class="svg-container">${data.svg}</div>
+    `;
+  }
+
+  html += '</div>';
+
+  outputDiv.innerHTML = html;
+  vizDiv.classList.add('hidden');
+
+  // Setup button listeners
+  document.querySelector('.copy-map-btn').addEventListener('click', () => {
+    const mapASCII = data.map.ascii || data.map;
+    navigator.clipboard.writeText(mapASCII);
+    showToast('✅ Mapa copiado al portapapeles', 'success');
+  });
+
+  document.querySelector('.download-lua-btn').addEventListener('click', () => {
+    if (data.lua) {
+      const element = document.createElement('a');
+      element.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(data.lua));
+      element.setAttribute('download', `map_${Date.now()}.lua`);
+      element.style.display = 'none';
+      document.body.appendChild(element);
+      element.click();
+      document.body.removeChild(element);
+      showToast('✅ Código Lua descargado', 'success');
+    }
+  });
+}
 
 // Welcome message
 console.log('🦈 DataShark IA Frontend loaded');

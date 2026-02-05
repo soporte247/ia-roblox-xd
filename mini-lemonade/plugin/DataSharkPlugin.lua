@@ -597,7 +597,7 @@ local function generateCode()
 					task.wait(0.05)
 				end
 				
-				-- Guardar en historial
+				-- Guardar en historial local
 				table.insert(state.history, 1, {
 					timestamp = os.date("%Y-%m-%d %H:%M:%S"),
 					prompt = state.currentPrompt,
@@ -612,6 +612,33 @@ local function generateCode()
 				
 				Storage.set("history", HttpService:JSONEncode(state.history))
 				updateHistoryView()
+				
+				-- Guardar en historial sincronizado (BD)
+				task.spawn(function()
+					local syncBody = HttpService:JSONEncode({
+						userId = state.userId,
+						originalPrompt = state.currentPrompt,
+						systemType = state.currentSystemType,
+						questions = currentQuestions,
+						answers = answers,
+						generatedCode = HttpService:JSONEncode(data.code),
+						source = "plugin",
+						sessionId = state.sessionId
+					})
+					
+					local syncResponse = Http.request(state.backendUrl .. "/api/sync-history/save", "POST", syncBody)
+					if syncResponse then
+						local syncSuccess, syncData = pcall(function()
+							return HttpService:JSONDecode(syncResponse)
+						end)
+						
+						if syncSuccess and syncData.success then
+							Logger.success("✓ Historial sincronizado con BD")
+						else
+							Logger.warn("⚠ Error al sincronizar historial: " .. (syncData.error or "desconocido"))
+						end
+					end
+				end)
 				
 				local fileListStr = table.concat(fileList, ", ")
 				

@@ -132,6 +132,23 @@ export const initDB = async () => {
       )
     `);
 
+    // Historial compartido plugin + web
+    await dbRun(`
+      CREATE TABLE IF NOT EXISTS clarification_history (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        userId TEXT NOT NULL,
+        originalPrompt TEXT NOT NULL,
+        systemType TEXT,
+        questions TEXT,
+        answers TEXT,
+        generatedCode TEXT,
+        source TEXT DEFAULT 'web',
+        sessionId TEXT,
+        createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (userId) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `);
+
     console.log('✅ Database schema initialized');
   } catch (err) {
     console.error('❌ Error initializing database:', err);

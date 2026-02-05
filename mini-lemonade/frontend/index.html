@@ -150,6 +150,7 @@
           <label for="prompt">Describe el sistema que necesitas:</label>
           <div class="header-controls">
             <button id="templatesBtn" class="btn btn-small">📋 Plantillas</button>
+            <button id="mapsBtn" class="btn btn-small">🗺️ Generador de Mapas</button>
             <select id="systemType" class="system-select" title="Tipo de sistema">
               <option value="auto">Auto-detectar</option>
               <option value="attack">⚔️ Attack</option>
@@ -266,6 +267,40 @@
         <button class="modal-close">&times;</button>
       </div>
       <div id="templatesList" class="templates-list"></div>
+    </div>
+  </div>
+
+  <!-- Maps Generator Modal -->
+  <div id="mapsModal" class="modal hidden">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>🗺️ Generador de Mapas</h2>
+        <button class="modal-close">&times;</button>
+      </div>
+      <div class="maps-content">
+        <div class="maps-input">
+          <h3>Crear Mapa Personalizado</h3>
+          <textarea id="mapDescription" placeholder="Ej: Crea un laberinto con trampas y un tesoro al final" rows="3"></textarea>
+          <div class="maps-controls">
+            <label>Ancho: <input type="number" id="mapWidth" value="20" min="10" max="50"></label>
+            <label>Alto: <input type="number" id="mapHeight" value="15" min="10" max="40"></label>
+            <button id="generateMapBtn" class="btn btn-primary">🎨 Generar Mapa</button>
+          </div>
+        </div>
+
+        <div class="maps-presets">
+          <h3>Mapas Predefinidos</h3>
+          <div class="preset-buttons">
+            <button class="btn btn-secondary preset-btn" data-type="maze">🔀 Laberinto</button>
+            <button class="btn btn-secondary preset-btn" data-type="dungeon">🏰 Dungeon</button>
+            <button class="btn btn-secondary preset-btn" data-type="island">🏝️ Isla</button>
+            <button class="btn btn-secondary preset-btn" data-type="random">🎲 Aleatorio</button>
+          </div>
+        </div>
+
+        <div id="mapOutput" class="map-output"></div>
+        <div id="mapVisualization" class="map-visualization hidden"></div>
+      </div>
     </div>
   </div>
 

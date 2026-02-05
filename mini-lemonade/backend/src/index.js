@@ -18,6 +18,8 @@ import apiKeysRouter from './routes/apikeys.js';
 import pluginRouter from './routes/plugin.js';
 import logsRouter from './routes/logs.js';
 import clarifyRouter from './routes/clarify.js';
+import syncHistoryRouter from './routes/sync-history.js';
+import mapsRouter from './routes/maps.js';
 import { initDB } from './services/database.js';
 import { requestLogger, requestTimeout, rateLimit } from './middleware/errorHandler.js';
 import { monitor } from './services/healthMonitor.js';
@@ -83,6 +85,12 @@ app.use('/api/logs', logsRouter);
 
 // Rutas de Clarificación (preguntas y respuestas)
 app.use('/api/clarify', clarifyRouter);
+
+// Rutas de Sincronización de Historial
+app.use('/api/sync-history', syncHistoryRouter);
+
+// Rutas de Mapas
+app.use('/api/maps', mapsRouter);
 
 // Rutas existentes (pueden usar autenticación flexible)
 app.use('/generate', generateRoute);
