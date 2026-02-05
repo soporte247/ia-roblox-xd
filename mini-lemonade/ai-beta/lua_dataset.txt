@@ -1,0 +1,773 @@
+-- ROBLOX LUA TRAINING DATASET
+-- Sistema de Combate con Cooldown
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+
+local AttackSystem = {}
+AttackSystem.__index = AttackSystem
+
+function AttackSystem.new(player)
+    local self = setmetatable({}, AttackSystem)
+    self.player = player
+    self.damage = 25
+    self.cooldown = 1.5
+    self.canAttack = true
+    self.range = 15
+    return self
+end
+
+function AttackSystem:Attack(target)
+    if not self.canAttack then return false end
+    
+    local distance = (self.player.Character.HumanoidRootPart.Position - target.Position).Magnitude
+    if distance > self.range then return false end
+    
+    self.canAttack = false
+    local humanoid = target.Parent:FindFirstChild("Humanoid")
+    if humanoid then
+        humanoid:TakeDamage(self.damage)
+    end
+    
+    task.wait(self.cooldown)
+    self.canAttack = true
+    return true
+end
+
+return AttackSystem
+
+-- Sistema de Inventario con Slots
+local Inventory = {}
+Inventory.__index = Inventory
+
+function Inventory.new(maxSlots)
+    local self = setmetatable({}, Inventory)
+    self.items = {}
+    self.maxSlots = maxSlots or 20
+    return self
+end
+
+function Inventory:AddItem(itemName, quantity)
+    quantity = quantity or 1
+    
+    if self:GetItemCount() >= self.maxSlots then
+        return false, "Inventario lleno"
+    end
+    
+    if self.items[itemName] then
+        self.items[itemName] = self.items[itemName] + quantity
+    else
+        self.items[itemName] = quantity
+    end
+    
+    return true
+end
+
+function Inventory:RemoveItem(itemName, quantity)
+    quantity = quantity or 1
+    
+    if not self.items[itemName] then
+        return false, "Item no encontrado"
+    end
+    
+    if self.items[itemName] < quantity then
+        return false, "Cantidad insuficiente"
+    end
+    
+    self.items[itemName] = self.items[itemName] - quantity
+    
+    if self.items[itemName] <= 0 then
+        self.items[itemName] = nil
+    end
+    
+    return true
+end
+
+function Inventory:GetItemCount()
+    local count = 0
+    for _ in pairs(self.items) do
+        count = count + 1
+    end
+    return count
+end
+
+function Inventory:HasItem(itemName)
+    return self.items[itemName] ~= nil
+end
+
+return Inventory
+
+-- Sistema de Quest con Objetivos
+local QuestSystem = {}
+QuestSystem.__index = QuestSystem
+
+function QuestSystem.new(questData)
+    local self = setmetatable({}, QuestSystem)
+    self.id = questData.id
+    self.name = questData.name
+    self.description = questData.description
+    self.objectives = questData.objectives or {}
+    self.rewards = questData.rewards or {}
+    self.completed = false
+    self.progress = {}
+    
+    for _, objective in ipairs(self.objectives) do
+        self.progress[objective.id] = 0
+    end
+    
+    return self
+end
+
+function QuestSystem:UpdateProgress(objectiveId, amount)
+    if self.completed then return false end
+    
+    if self.progress[objectiveId] then
+        self.progress[objectiveId] = self.progress[objectiveId] + amount
+        
+        for _, objective in ipairs(self.objectives) do
+            if objective.id == objectiveId then
+                if self.progress[objectiveId] >= objective.target then
+                    objective.completed = true
+                end
+                break
+            end
+        end
+        
+        self:CheckCompletion()
+        return true
+    end
+    
+    return false
+end
+
+function QuestSystem:CheckCompletion()
+    local allCompleted = true
+    
+    for _, objective in ipairs(self.objectives) do
+        if not objective.completed then
+            allCompleted = false
+            break
+        end
+    end
+    
+    if allCompleted then
+        self.completed = true
+        self:GiveRewards()
+    end
+end
+
+function QuestSystem:GiveRewards()
+    print("Quest completada:", self.name)
+    for _, reward in ipairs(self.rewards) do
+        print("Recompensa:", reward.type, reward.amount)
+    end
+end
+
+return QuestSystem
+
+-- Sistema de Shop con Moneda
+local ShopSystem = {}
+ShopSystem.__index = ShopSystem
+
+function ShopSystem.new()
+    local self = setmetatable({}, ShopSystem)
+    self.items = {}
+    return self
+end
+
+function ShopSystem:AddProduct(itemId, itemName, price, stock)
+    self.items[itemId] = {
+        name = itemName,
+        price = price,
+        stock = stock or -1
+    }
+end
+
+function ShopSystem:Purchase(player, itemId)
+    local item = self.items[itemId]
+    if not item then
+        return false, "Item no existe"
+    end
+    
+    if item.stock == 0 then
+        return false, "Sin stock"
+    end
+    
+    local currency = player:FindFirstChild("leaderstats"):FindFirstChild("Coins")
+    if not currency or currency.Value < item.price then
+        return false, "Dinero insuficiente"
+    end
+    
+    currency.Value = currency.Value - item.price
+    
+    if item.stock > 0 then
+        item.stock = item.stock - 1
+    end
+    
+    return true, item.name
+end
+
+return ShopSystem
+
+-- Sistema de Daño Crítico
+local CritSystem = {}
+
+function CritSystem.CalculateDamage(baseDamage, critChance, critMultiplier)
+    critChance = critChance or 0.15
+    critMultiplier = critMultiplier or 2
+    
+    local random = math.random()
+    local isCrit = random < critChance
+    
+    if isCrit then
+        return baseDamage * critMultiplier, true
+    else
+        return baseDamage, false
+    end
+end
+
+return CritSystem
+
+-- Sistema de Teletransporte
+local TeleportService = game:GetService("TeleportService")
+local Players = game:GetService("Players")
+
+local TeleportSystem = {}
+
+function TeleportSystem.TeleportPlayer(player, position)
+    if not player.Character then return false end
+    
+    local humanoidRootPart = player.Character:FindFirstChild("HumanoidRootPart")
+    if not humanoidRootPart then return false end
+    
+    humanoidRootPart.CFrame = CFrame.new(position)
+    return true
+end
+
+function TeleportSystem.TeleportToPlayer(player, targetPlayer)
+    if not targetPlayer.Character then return false end
+    
+    local targetPosition = targetPlayer.Character.HumanoidRootPart.Position
+    return TeleportSystem.TeleportPlayer(player, targetPosition)
+end
+
+return TeleportSystem
+
+-- Sistema de Experiencia y Nivel
+local LevelSystem = {}
+LevelSystem.__index = LevelSystem
+
+function LevelSystem.new(player)
+    local self = setmetatable({}, LevelSystem)
+    self.player = player
+    self.level = 1
+    self.exp = 0
+    self.expToNextLevel = 100
+    return self
+end
+
+function LevelSystem:AddExp(amount)
+    self.exp = self.exp + amount
+    
+    while self.exp >= self.expToNextLevel do
+        self:LevelUp()
+    end
+end
+
+function LevelSystem:LevelUp()
+    self.level = self.level + 1
+    self.exp = self.exp - self.expToNextLevel
+    self.expToNextLevel = math.floor(self.expToNextLevel * 1.5)
+    
+    print(self.player.Name .. " subió al nivel " .. self.level)
+end
+
+function LevelSystem:GetProgress()
+    return (self.exp / self.expToNextLevel) * 100
+end
+
+return LevelSystem
+
+-- Sistema de Animaciones
+local AnimationSystem = {}
+
+function AnimationSystem.PlayAnimation(character, animationId)
+    local humanoid = character:FindFirstChild("Humanoid")
+    if not humanoid then return end
+    
+    local animator = humanoid:FindFirstChildOfClass("Animator")
+    if not animator then
+        animator = Instance.new("Animator")
+        animator.Parent = humanoid
+    end
+    
+    local animation = Instance.new("Animation")
+    animation.AnimationId = "rbxassetid://" .. animationId
+    
+    local track = animator:LoadAnimation(animation)
+    track:Play()
+    
+    return track
+end
+
+return AnimationSystem
+
+-- Sistema de Cooldowns
+local CooldownManager = {}
+CooldownManager.__index = CooldownManager
+
+function CooldownManager.new()
+    local self = setmetatable({}, CooldownManager)
+    self.cooldowns = {}
+    return self
+end
+
+function CooldownManager:SetCooldown(key, duration)
+    self.cooldowns[key] = os.clock() + duration
+end
+
+function CooldownManager:IsReady(key)
+    if not self.cooldowns[key] then return true end
+    
+    if os.clock() >= self.cooldowns[key] then
+        self.cooldowns[key] = nil
+        return true
+    end
+    
+    return false
+end
+
+function CooldownManager:GetRemaining(key)
+    if not self.cooldowns[key] then return 0 end
+    
+    local remaining = self.cooldowns[key] - os.clock()
+    return math.max(0, remaining)
+end
+
+return CooldownManager
+
+-- Sistema de Spawn de Enemigos
+local SpawnSystem = {}
+
+function SpawnSystem.SpawnEnemy(enemyModel, position, health)
+    local enemy = enemyModel:Clone()
+    enemy:SetPrimaryPartCFrame(CFrame.new(position))
+    
+    local humanoid = enemy:FindFirstChild("Humanoid")
+    if humanoid then
+        humanoid.MaxHealth = health
+        humanoid.Health = health
+    end
+    
+    enemy.Parent = workspace.Enemies
+    return enemy
+end
+
+function SpawnSystem.SpawnWave(enemyModel, positions, health)
+    local enemies = {}
+    
+    for _, pos in ipairs(positions) do
+        local enemy = SpawnSystem.SpawnEnemy(enemyModel, pos, health)
+        table.insert(enemies, enemy)
+        task.wait(0.5)
+    end
+    
+    return enemies
+end
+
+return SpawnSystem
+
+-- Sistema de Health Regeneración
+local HealthRegen = {}
+HealthRegen.__index = HealthRegen
+
+function HealthRegen.new(humanoid, regenRate, regenAmount)
+    local self = setmetatable({}, HealthRegen)
+    self.humanoid = humanoid
+    self.regenRate = regenRate or 1
+    self.regenAmount = regenAmount or 5
+    self.active = true
+    
+    task.spawn(function()
+        self:StartRegeneration()
+    end)
+    
+    return self
+end
+
+function HealthRegen:StartRegeneration()
+    while self.active do
+        task.wait(self.regenRate)
+        
+        if self.humanoid.Health > 0 and self.humanoid.Health < self.humanoid.MaxHealth then
+            self.humanoid.Health = math.min(
+                self.humanoid.Health + self.regenAmount,
+                self.humanoid.MaxHealth
+            )
+        end
+    end
+end
+
+function HealthRegen:Stop()
+    self.active = false
+end
+
+return HealthRegen
+
+-- Sistema de Particles Effects
+local ParticleSystem = {}
+
+function ParticleSystem.CreateExplosion(position, color)
+    local explosion = Instance.new("Explosion")
+    explosion.Position = position
+    explosion.BlastRadius = 10
+    explosion.BlastPressure = 500000
+    explosion.Parent = workspace
+    
+    local particle = Instance.new("ParticleEmitter")
+    particle.Texture = "rbxassetid://6101261868"
+    particle.Color = ColorSequence.new(color)
+    particle.Rate = 100
+    particle.Lifetime = NumberRange.new(0.5, 1)
+    particle.Speed = NumberRange.new(5, 10)
+    
+    local part = Instance.new("Part")
+    part.Transparency = 1
+    part.Anchored = true
+    part.CanCollide = false
+    part.Position = position
+    part.Parent = workspace
+    
+    particle.Parent = part
+    
+    task.wait(1)
+    particle.Enabled = false
+    task.wait(2)
+    part:Destroy()
+end
+
+return ParticleSystem
+
+-- Sistema de Team Manager
+local TeamManager = {}
+
+function TeamManager.CreateTeam(teamName, teamColor)
+    local team = Instance.new("Team")
+    team.Name = teamName
+    team.TeamColor = teamColor
+    team.Parent = game:GetService("Teams")
+    return team
+end
+
+function TeamManager.AssignPlayerToTeam(player, teamName)
+    local teams = game:GetService("Teams")
+    local team = teams:FindFirstChild(teamName)
+    
+    if team then
+        player.Team = team
+        return true
+    end
+    
+    return false
+end
+
+function TeamManager.GetTeamPlayers(teamName)
+    local teams = game:GetService("Teams")
+    local team = teams:FindFirstChild(teamName)
+    
+    if not team then return {} end
+    
+    local players = {}
+    for _, player in ipairs(game:GetService("Players"):GetPlayers()) do
+        if player.Team == team then
+            table.insert(players, player)
+        end
+    end
+    
+    return players
+end
+
+return TeamManager
+
+-- Sistema de GUI con Tweening
+local TweenService = game:GetService("TweenService")
+
+local UIAnimator = {}
+
+function UIAnimator.FadeIn(guiObject, duration)
+    guiObject.Visible = true
+    
+    local tweenInfo = TweenInfo.new(
+        duration or 0.5,
+        Enum.EasingStyle.Quad,
+        Enum.EasingDirection.Out
+    )
+    
+    local tween = TweenService:Create(guiObject, tweenInfo, {
+        BackgroundTransparency = 0
+    })
+    
+    tween:Play()
+    return tween
+end
+
+function UIAnimator.FadeOut(guiObject, duration)
+    local tweenInfo = TweenInfo.new(
+        duration or 0.5,
+        Enum.EasingStyle.Quad,
+        Enum.EasingDirection.In
+    )
+    
+    local tween = TweenService:Create(guiObject, tweenInfo, {
+        BackgroundTransparency = 1
+    })
+    
+    tween:Play()
+    tween.Completed:Connect(function()
+        guiObject.Visible = false
+    end)
+    
+    return tween
+end
+
+function UIAnimator.SlideIn(guiObject, fromPosition, toPosition, duration)
+    guiObject.Position = fromPosition
+    guiObject.Visible = true
+    
+    local tweenInfo = TweenInfo.new(
+        duration or 0.5,
+        Enum.EasingStyle.Back,
+        Enum.EasingDirection.Out
+    )
+    
+    local tween = TweenService:Create(guiObject, tweenInfo, {
+        Position = toPosition
+    })
+    
+    tween:Play()
+    return tween
+end
+
+return UIAnimator
+
+-- Sistema de Data Store
+local DataStoreService = game:GetService("DataStoreService")
+local PlayerData = DataStoreService:GetDataStore("PlayerData")
+
+local DataManager = {}
+
+function DataManager.SaveData(userId, data)
+    local success, err = pcall(function()
+        PlayerData:SetAsync(tostring(userId), data)
+    end)
+    
+    if not success then
+        warn("Error guardando datos:", err)
+        return false
+    end
+    
+    return true
+end
+
+function DataManager.LoadData(userId)
+    local success, data = pcall(function()
+        return PlayerData:GetAsync(tostring(userId))
+    end)
+    
+    if not success then
+        warn("Error cargando datos:", data)
+        return nil
+    end
+    
+    return data or {}
+end
+
+function DataManager.GetDefaultData()
+    return {
+        coins = 100,
+        level = 1,
+        exp = 0,
+        inventory = {},
+        quests = {}
+    }
+end
+
+return DataManager
+
+-- Sistema de Chat Commands
+local Players = game:GetService("Players")
+
+local CommandSystem = {}
+CommandSystem.commands = {}
+
+function CommandSystem.RegisterCommand(name, callback, permission)
+    CommandSystem.commands[name] = {
+        callback = callback,
+        permission = permission or "Player"
+    }
+end
+
+function CommandSystem.ExecuteCommand(player, message)
+    local args = string.split(message, " ")
+    local commandName = args[1]:lower():gsub("/", "")
+    
+    local command = CommandSystem.commands[commandName]
+    if not command then return end
+    
+    if command.permission == "Admin" and not player:GetRankInGroup(0) >= 255 then
+        return
+    end
+    
+    table.remove(args, 1)
+    command.callback(player, args)
+end
+
+Players.PlayerAdded:Connect(function(player)
+    player.Chatted:Connect(function(message)
+        if message:sub(1, 1) == "/" then
+            CommandSystem.ExecuteCommand(player, message)
+        end
+    end)
+end)
+
+-- Comandos de ejemplo
+CommandSystem.RegisterCommand("heal", function(player, args)
+    if player.Character and player.Character:FindFirstChild("Humanoid") then
+        player.Character.Humanoid.Health = player.Character.Humanoid.MaxHealth
+    end
+end, "Player")
+
+CommandSystem.RegisterCommand("speed", function(player, args)
+    local speed = tonumber(args[1]) or 16
+    if player.Character and player.Character:FindFirstChild("Humanoid") then
+        player.Character.Humanoid.WalkSpeed = math.clamp(speed, 16, 100)
+    end
+end, "Admin")
+
+return CommandSystem
+
+-- Sistema de Proximity Prompt
+local ProximityPromptService = game:GetService("ProximityPromptService")
+
+local InteractionSystem = {}
+
+function InteractionSystem.CreatePrompt(part, text, callback)
+    local prompt = Instance.new("ProximityPrompt")
+    prompt.ActionText = text
+    prompt.ObjectText = part.Name
+    prompt.MaxActivationDistance = 10
+    prompt.RequiresLineOfSight = false
+    prompt.Parent = part
+    
+    prompt.Triggered:Connect(function(player)
+        callback(player, part)
+    end)
+    
+    return prompt
+end
+
+function InteractionSystem.CreateDoor(doorPart, isLocked)
+    local prompt = InteractionSystem.CreatePrompt(doorPart, "Abrir", function(player)
+        if isLocked then
+            print("Puerta cerrada")
+            return
+        end
+        
+        doorPart.CanCollide = false
+        doorPart.Transparency = 0.5
+        
+        task.wait(3)
+        
+        doorPart.CanCollide = true
+        doorPart.Transparency = 0
+    end)
+    
+    return prompt
+end
+
+return InteractionSystem
+
+-- Sistema de Estado Finite State Machine
+local FSM = {}
+FSM.__index = FSM
+
+function FSM.new()
+    local self = setmetatable({}, FSM)
+    self.states = {}
+    self.currentState = nil
+    return self
+end
+
+function FSM:AddState(name, onEnter, onExit, onUpdate)
+    self.states[name] = {
+        onEnter = onEnter or function() end,
+        onExit = onExit or function() end,
+        onUpdate = onUpdate or function() end
+    }
+end
+
+function FSM:ChangeState(newState)
+    if self.currentState then
+        self.states[self.currentState].onExit()
+    end
+    
+    self.currentState = newState
+    self.states[self.currentState].onEnter()
+end
+
+function FSM:Update()
+    if self.currentState then
+        self.states[self.currentState].onUpdate()
+    end
+end
+
+return FSM
+
+-- Sistema de Pathfinding AI
+local PathfindingService = game:GetService("PathfindingService")
+
+local AIController = {}
+
+function AIController.MoveToPosition(npc, targetPosition)
+    local humanoid = npc:FindFirstChild("Humanoid")
+    if not humanoid then return end
+    
+    local path = PathfindingService:CreatePath({
+        AgentRadius = 2,
+        AgentHeight = 5,
+        AgentCanJump = true
+    })
+    
+    local success, err = pcall(function()
+        path:ComputeAsync(npc.HumanoidRootPart.Position, targetPosition)
+    end)
+    
+    if not success then
+        warn("Error calculando path:", err)
+        return
+    end
+    
+    if path.Status == Enum.PathStatus.Success then
+        local waypoints = path:GetWaypoints()
+        
+        for _, waypoint in ipairs(waypoints) do
+            if waypoint.Action == Enum.PathWaypointAction.Jump then
+                humanoid.Jump = true
+            end
+            
+            humanoid:MoveTo(waypoint.Position)
+            humanoid.MoveToFinished:Wait()
+        end
+    end
+end
+
+function AIController.ChasePlayer(npc, player)
+    task.spawn(function()
+        while npc.Parent and player.Character do
+            local targetPosition = player.Character.HumanoidRootPart.Position
+            AIController.MoveToPosition(npc, targetPosition)
+            task.wait(0.5)
+        end
+    end)
+end
+
+return AIController

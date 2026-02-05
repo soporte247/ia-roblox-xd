@@ -10,12 +10,23 @@ def load_text(data_path):
     if os.path.exists(data_path):
         with open(data_path, 'r', encoding='utf-8') as f:
             return f.read()
+    # Si no existe lua_dataset.txt, usar fallback
     return (
-        "Eres un asistente experto en programación.\n"
-        "Responde de forma clara, coherente y con buen estilo.\n"
-        "Ejemplo: \n"
-        "Usuario: crea un sistema de inventario en Roblox\n"
-        "Asistente: {\"files\": {\"InventoryService.lua\": \"-- code\"}}\n"
+        "-- Sistema de Inventario Roblox\n"
+        "local Inventory = {}\n"
+        "function Inventory.new(maxSlots)\n"
+        "    local self = {items = {}, maxSlots = maxSlots or 20}\n"
+        "    return self\n"
+        "end\n"
+        "function Inventory:AddItem(itemName, quantity)\n"
+        "    if self.items[itemName] then\n"
+        "        self.items[itemName] = self.items[itemName] + quantity\n"
+        "    else\n"
+        "        self.items[itemName] = quantity\n"
+        "    end\n"
+        "    return true\n"
+        "end\n"
+        "return Inventory\n"
     )
 
 
@@ -59,7 +70,7 @@ def main():
         'n_head': int(os.environ.get('N_HEAD', 8)),
         'n_embd': int(os.environ.get('N_EMBD', 320)),
         'dropout': float(os.environ.get('DROPOUT', 0.1)),
-        'max_iters': int(os.environ.get('MAX_ITERS', 2000)),
+        'max_iters': int(os.environ.get('MAX_ITERS', 5000)),
         'eval_interval': int(os.environ.get('EVAL_INTERVAL', 200)),
         'learning_rate': float(os.environ.get('LEARNING_RATE', 3e-4)),
     }
