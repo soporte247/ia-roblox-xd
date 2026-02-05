@@ -930,7 +930,7 @@ end
 
 print("🦈 DataShark IA Plugin v3.1 loaded!")
 print("✅ Code Injection System ACTIVADO")
-print("Backend: " .. getBackendUrl())
+print("Backend: " .. state.backendUrl)
 print("Usuario ID: " .. tostring(state.userId))
 print("Sistema de clarificación con IA integrado + Inyección automática")
 
